@@ -27,6 +27,8 @@ def main():
 
     rows = load_split(args.data, args.split, True, args.shuffle, args.limit)
     outs = [json.loads(l) for l in open(args.logits)]
+    if args.limit and len(outs) > len(rows):
+        outs = outs[:len(rows)]          # a --limit prefix of a full-split logits file
     assert len(outs) == len(rows), (len(outs), len(rows))
     for r, o in zip(rows, outs):
         assert "id" not in o or o["id"] == r["id"], (r["id"], o.get("id"))
