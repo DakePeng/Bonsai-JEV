@@ -106,7 +106,9 @@ One engineer, ~5 weeks. Rental hours in brackets.
 - `prism.hadamard.version=1`, `block_size=1024`, `transform=normalized-sylvester-walsh-hadamard`, `axis=input-last-dimension`, `sign_mode=explicit` with sign vectors for input widths 5120, 6144, 17408. 401 folded weights listed in `weight_names`. `gdn_v_grouped=true` → `ssm_out` gets the `perm_rep` feature permutation before signs and Hadamard.
 - **`output.weight` is PQ2_0 and folded (rotated).** The decision head is initialized from its 24 verbalizer rows, so either (a) the head consumes `H(s⊙h)` like the fork does for `output.weight`, or (b) un-rotate the 24 rows once at init (`row_plain = row_rot · H · diag(s)`) so the head consumes raw `h`. Pick (b): the head then exports as a plain 24×5120 matrix with no runtime transform.
 - `token_embd.weight` is PQ2_0 with `inverse-after-lookup` (version-1 explicit head, not tied).
-- Source of truth for ternary codes and scales: **unpack the PQ2_0 GGUF directly** (bit-identical to what the runtime sees) rather than downloading the separate vllm-format repo.
+- Source of truth for ternary codes and scales: **unpack the PQ2_0 GGUF directly** (bit-identical to what the runtime sees) rather than downloading the separate vllm-format repo. PQ2_0 block layout (`ggml-common.h`, `ggml-quants.c`): group of 128 weights = 1 fp16 scale `d` + 32 bytes of codes, 2 bits per weight little-endian within each byte (`q = (byte >> 2*(j%4)) & 3`), value `(q-1)*d`, code 3 unused. A 20-line numpy unpacker.
+- 640×480 image = **300 image tokens** in this runtime, as the original plan assumed.
+- Local assets on the 4070 box: fork at `~/bonsai/llama.cpp` (build in `build/bin`), models in `~/bonsai/models/bonsai2-27b`, dataset in `~/bonsai/data/jev-distill-corpus-v3` (from ModelScope), venv at `~/bonsai/venv`, project clone at `~/bonsai/jev`.
 
 ### Week 1 — P0 feasibility
 

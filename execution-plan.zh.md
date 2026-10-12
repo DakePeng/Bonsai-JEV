@@ -106,7 +106,9 @@
 - `prism.hadamard.version=1`，`block_size=1024`，`transform=normalized-sylvester-walsh-hadamard`，`axis=input-last-dimension`，`sign_mode=explicit`，符号向量覆盖输入宽度 5120、6144、17408。`weight_names` 列出 401 个折叠权重。`gdn_v_grouped=true` → `ssm_out` 在符号和 Hadamard 之前有 `perm_rep` 特征排列。
 - **`output.weight` 是 PQ2_0 且已折叠（旋转）。** 决策头从它的 24 行初始化，所以要么 (a) 决策头像分支处理 `output.weight` 那样吃 `H(s⊙h)`，要么 (b) 初始化时把这 24 行旋转回去一次（`row_plain = row_rot · H · diag(s)`），让决策头吃原始 `h`。选 (b)：导出就是一个普通的 24×5120 矩阵，运行时不需要任何变换。
 - `token_embd.weight` 是 PQ2_0，带 `inverse-after-lookup`（版本 1，显式输出头，非共享）。
-- 三值码和缩放因子的来源：**直接解包 PQ2_0 GGUF**（和运行时看到的逐位一致），不另外下载 vllm 格式的仓库。
+- 三值码和缩放因子的来源：**直接解包 PQ2_0 GGUF**（和运行时看到的逐位一致），不另外下载 vllm 格式的仓库。PQ2_0 块布局（`ggml-common.h`、`ggml-quants.c`）：每 128 个权重一组 = 1 个 fp16 缩放因子 `d` + 32 字节码，每个权重 2 bit，字节内小端（`q = (byte >> 2*(j%4)) & 3`），数值 `(q-1)*d`，码 3 不用。numpy 解包 20 行。
+- 640×480 的图在这个运行时里是 **300 个图片 token**，和原方案假设一致。
+- 4070 机器上的本地资源：分支在 `~/bonsai/llama.cpp`（二进制在 `build/bin`），模型在 `~/bonsai/models/bonsai2-27b`，数据集在 `~/bonsai/data/jev-distill-corpus-v3`（来自 ModelScope），venv 在 `~/bonsai/venv`，项目克隆在 `~/bonsai/jev`。
 
 ### 第 1 周 — P0 可行性
 
