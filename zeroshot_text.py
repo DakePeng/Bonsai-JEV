@@ -85,6 +85,7 @@ def main():
     ap.add_argument("--ctx", type=int, default=4096)
     ap.add_argument("--out", default=None)
     ap.add_argument("--from-logits", default=None, help="rescore an existing tool output instead of running the model")
+    ap.add_argument("--resume", action="store_true", help="continue an interrupted run: skip rows already in the raw logits file")
     args = ap.parse_args()
 
     rows = [json.loads(l) for l in open(os.path.join(args.data, args.split + ".jsonl"))]
@@ -100,15 +101,20 @@ def main():
     if args.from_logits:
         outs = [json.loads(l) for l in open(args.from_logits)]
     else:
+        raw = (args.out or f"zeroshot_{args.split}") + ".logits.jsonl"
+        start = 0
+        if args.resume and os.path.exists(raw):
+            start = sum(1 for _ in open(raw))
+            print(f"resuming after {start} rows", file=sys.stderr)
         with tempfile.NamedTemporaryFile("w", suffix=".jsonl", delete=False) as f:
-            for r in rows:
+            for r in rows[start:]:
                 f.write(json.dumps({"prompt": render(r)}, ensure_ascii=False) + "\n")
             pin = f.name
-        raw = (args.out or f"zeroshot_{args.split}") + ".logits.jsonl"
         env = dict(os.environ, CANDS=",".join(map(str, VERBALIZER_IDS)))
-        with open(pin) as fi, open(raw, "w") as fo:
-            subprocess.run([args.tool, "-m", args.model, "-ngl", "99", "-c", str(args.ctx), "--log-disable"],
-                           stdin=fi, stdout=fo, env=env, check=True)
+        if start < len(rows):
+            with open(pin) as fi, open(raw, "a" if start else "w") as fo:
+                subprocess.run([args.tool, "-m", args.model, "-ngl", "99", "-c", str(args.ctx), "--log-disable"],
+                               stdin=fi, stdout=fo, env=env, check=True)
         outs = [json.loads(l) for l in open(raw)]
         print(f"raw logits -> {raw}", file=sys.stderr)
     assert len(outs) == len(rows), (len(outs), len(rows))
