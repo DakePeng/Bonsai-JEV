@@ -18,10 +18,11 @@ fi
 python3 -c "import vllm" 2>/dev/null || { echo "10b: vllm not installed"; exit 0; }
 
 echo "[$(date +%T)] starting vLLM (fp8)"
-setsid nohup python3 ~/bonsai/JEV-27B-DEMO/common/serve_decide.py --model "$BASE" --served-model-name autotrust/JEV-9B \
+# flags from JEV-9B/vl/serve.sh, with a 4k context, fp8 and eager mode to fit 12 GB
+setsid nohup python3 ~/bonsai/models/jev-9b/vl/serve_decide.py --model "$BASE" --served-model-name autotrust/JEV-9B \
   --enable-lora --max-lora-rank 32 --lora-modules jev-decision="$ADAPTER" \
   --logprobs-mode processed_logprobs --max-model-len 4096 --enable-prefix-caching --mamba-cache-mode align \
-  --limit-mm-per-prompt '{"image": 2}' --max-num-seqs 8 --trust-request-chat-template \
+  --limit-mm-per-prompt '{"image": 2}' --max-num-seqs 8 --max-logprobs 256 --trust-request-chat-template \
   --quantization fp8 --gpu-memory-utilization 0.92 --enforce-eager --port "$PORT" > "$LOG" 2>&1 < /dev/null &
 SRV=$!
 for i in $(seq 1 180); do
