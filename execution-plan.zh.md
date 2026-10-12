@@ -75,7 +75,7 @@
 
 | 风险 | 为什么重要 | 怎么查 |
 |---|---|---|
-| **每个运行时里 LoRA 都必须看到 Hadamard 旋转后的输入。** | 训练出来的是 B·A·(H·x)。如果 llama.cpp 把 H 融合进了三值矩阵乘法内核，它的 LoRA 路径加的就是 B·A·x，用的是*没旋转*的输入。静默出错。 | P0：读分支里的 LoRA 计算图。如果 LoRA 看到的是原始 x，就在导出时把旋转烘进 A（A' = A·H，一次矩阵乘法）。 |
+| **LoRA 坐标系不匹配。2026-10-12 已确认。** | 分支的 `build_lora_mm`（`src/llama-graph.cpp`）里，底座矩阵乘法用的是旋转后的输入 `cur_mm = H(s⊙Px)`，而 LoRA 分支用的是原始 `cur`。按 B·A·(H·x) 训练的 LoRA 会被套在错误的输入上，静默出错。 | **决定：** PyTorch 训练模型完全照搬分支：冻结底座用旋转后的输入，LoRA 用原始输入。这样 A 天生就在普通坐标系里，导出不需要任何数学变换。原方案"在旋转坐标系里训练"对 LoRA 路径不再适用。 |
 | **JEV 没有公开训练代码。** | 整个训练器（决策头、KL+RPS 损失、分层采样、打乱增强）都是照 README 写的。 | P1 冒烟必须复现 README 里损失曲线的形状。预留 3–5 天，不是 3 天。 |
 | **Qwen3.8 混合注意力需要训练级内核。** | 线性注意力（Gated DeltaNet 一类）的反向传播要快，HF 实现里得有 `flash-linear-attention` 或等价物。 | P0 第一次租卡时先验证这个，别的都往后放。 |
 | **bonjev 不是真正的备选。** | 16 个 commit，不做训练，它说的"LoRA"是把现成的 delta 重新组合。只有读 logit 的做法可以借鉴。 | 当参考代码看，不当依赖。 |
@@ -100,10 +100,10 @@
 
 ### 第 1 周 — P0 可行性
 
-6. **解包 + Hadamard 的 PyTorch 模型。** 写 `bonsai_torch.py`：加载三值码和缩放因子，按 `(code-1)*scale` 解包成 BF16，给每个线性层包一层按 1024 分块的快速 Walsh-Hadamard 变换和 `config.json` 里的符号向量。复用 HF 的 Qwen3.8 模型类，只换线性层。
+6. **解包 + Hadamard 的 PyTorch 模型。** 写 `bonsai_torch.py`：加载三值码和缩放因子，按 `(code-1)*scale` 解包成 BF16，给每个线性层包成 `y = W_rot · H(s⊙Px) + B·A·x`，其中每个权重的排列、符号、按 1024 分块的归一化 Sylvester Walsh-Hadamard 都从 GGUF 的 `prism.hadamard.*` 元数据读。底座路径旋转，LoRA 路径不旋转，和分支完全一致。复用 HF 的 Qwen3.8 模型类，只换线性层。
 7. **在 4070 上逐层对齐，不租卡。** 用分支的 `llama-eval-callback` 对 20 个 prompt 导出每个 block 之后的隐藏状态。然后在 PyTorch 里一次加载一层 BF16（每层约 0.85 GB），喂导出的输入隐藏状态，比较输出。目标：最大绝对差在 BF16 噪声范围内。这样能把错误定位到某一层，花费 $0。
 8. **全模型对齐** [PRO 6000 ×1，3–4 小时]：跑完整的 PyTorch 模型，用同样 20 个 prompt 和分支比较最终 logits。
-9. **检查 llama.cpp 里的 LoRA 位置。** 读分支的 LoRA 代码，并加载 AtomicChat 那个 rank-1 LoRA GGUF 当具体例子。确认 LoRA 的输入是在 Hadamard 之前还是之后。把结论写下来。
+9. **检查 llama.cpp 里的 LoRA 位置。2026-10-12 已完成。** LoRA 的输入在 **Hadamard 之前**（原始 `cur`），底座的输入在 Hadamard 之后。另外发现：分支按权重张量逐个从 GGUF 的 `prism.hadamard.*` 键注册旋转，部分权重在符号和 Hadamard 之前还有一个特征排列（`perm_rep`，GDN v 分组），符号在变换之前乘。`bonsai_torch.py` 必须读这些键，只在底座路径上复现 P → ⊙s → H 这条流水线。
 10. **在 4070 上测零样本基线。** 不挂 LoRA，直接读字母 logits。用分支跑 `test_set_30k`（原版 Jev 标注的部分）的文本 KL 和 VL-RewardBench。这是训练后模型必须超过的下限。
 10b. **在 4070 上跑 JEV-9B FP8，一次干两件事。** vLLM FP8，`--max-model-len 8192`，原封不动用 JEV-27B-DEMO 的评测代码。(a) 下限门槛：KL、ECE、机械臂 demo 成功率。(b) **评测代码校验：** 如果复现出公开的 VL-RewardBench 74.3% 和 KL 约 0.019，评测代码就可信，JEV-27B-VL 公开的 78.3% / AUROC 0.91 / KL 0.017 直接拿来当目标。不需要重跑教师模型。
 11. **混合注意力的训练内核** [同一次会话]：先确认 PyTorch 和 Triton 都认出 sm_120，再给 PyTorch 模型挂上 LoRA，开梯度检查点，micro-batch 24k token，跑一次前向加反向。记录单步时间和峰值显存。用来确认 P2 的时间估算。
