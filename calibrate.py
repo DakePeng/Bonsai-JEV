@@ -39,7 +39,8 @@ def fit_temperature(zs, ts):
         l.backward()
         return l
     opt.step(closure)
-    return logT.exp().item()
+    # ponytail: clamp; a tiny or near-uniform sample drives T to infinity. A real fit lands near 1.
+    return float(min(10.0, max(0.1, logT.exp().item())))
 
 
 def main():

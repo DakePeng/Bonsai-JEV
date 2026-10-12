@@ -132,7 +132,8 @@
 
 12. **2026-10-12 已完成（代码 + CPU 冒烟）。** `train.py`：用 `bonsai_torch.build_model` 加载冻结底座（不含 lm_head 的文本模型，BF16 约 51 GB），peft LoRA r16/α32/dropout 0.05 挂在 JEV 的 10 个目标模块上（LoRA 参数 fp32，bf16 autocast），fp32 的 24 位决策头带偏置，用旋转回去的 lm_head 行初始化（`decision_head_rows`），KL + 0.5·RPS，30% 选择题打乱，分层的 128 行步，按长度分桶、受 token 预算限制的 micro-batch，梯度检查点，AdamW (0.9, 0.98) 两个学习率，余弦 + 3% 预热，裁剪 1，`torchrun` DDP 两卡，checkpoint/续跑（`last/`、`final/`：peft 适配器 + `head.safetensors` + `head.json`），CSV 日志，定期按类型算验证 KL。在 4070 机器上**用 CPU** 和截断到 2 层的模型冒烟（`--layers 2 --device cpu`）：损失下降，评估/保存/续跑都正常。可用训练行约 50.7 万 → 0.93 个 epoch 约 3,700 步。
     原规格：基于 `peft` 写 `train.py`：24 位 fp32 决策头，用 `lm_head` 对应行初始化；在有效位上算 KL(target‖model)，打分题加 0.5·RPS；选择题 30% 打乱选项增强；分层采样器（每类 ≥ 1/6）；按长度分桶；AdamW (0.9, 0.98)，决策头学习率 2e-4、LoRA 1e-4，余弦退火，3% 预热，梯度裁剪 1.0。去掉 `yuri_v1` 里 [0.5, 0.5] 占位标签的行。
-13. 写 `calibrate.py`（在 `calibration` 划分上对每类用 L-BFGS 拟合温度）和 `eval_text.py`（在 `test_set_30k` 和 `ood` 上算 KL、ECE、准确率）。这两个在 4070 上对着 llama.cpp 或 PyTorch 模型跑。
+13. **2026-10-12 已完成。** `infer_logits.py`（checkpoint → 每行 24 位 logits，和 `decide-logits` 同格式的 JSONL）、`calibrate.py`（在 `calibration` 上按类型用 L-BFGS 最小化 KL 拟合温度，限制在 [0.1, 10]，输出 JEV 格式的 `calibration.json` 并带拟合前后的 KL 和 ECE）、`eval_text.py`（按类型和来源算 KL、准确率、ECE，可选温度，零样本和训练后的 logits 通用）。共享的 `load_split()` 保证所有脚本的行筛选和顺序一致。在 600 行零样本样本上测过（拟合温度：noul 1.15、score 2.22、choice 1.62 → 底座过度自信；KL 0.463 → 0.441），也在 CPU 上用 2 层冒烟 checkpoint 走通了全流程。
+    原规格：`calibrate.py`（在 `calibration` 划分上对每类用 L-BFGS 拟合温度）和 `eval_text.py`（在 `test_set_30k` 和 `ood` 上算 KL、ECE、准确率）。
 14. **在 27B 上用 1% 训练数据冒烟** [PRO 6000 ×1，3–4 小时，约 ¥30]。损失必须下降；先跑只训决策头的版本（LoRA 冻结）做 sanity check，再跑完整版。存一个 checkpoint，对它跑 `eval_text.py`。
 15. 把这个 checkpoint 转成 GGUF LoRA 加决策头矩阵。在 4070 上用分支加载。在 200 行上比较 PyTorch 和分支的概率。这是能最早抓到 LoRA 位置 bug 的地方。
 
