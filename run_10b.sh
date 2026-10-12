@@ -23,7 +23,7 @@ setsid nohup python3 ~/bonsai/models/jev-9b/vl/serve_decide.py --model "$BASE" -
   --enable-lora --max-lora-rank 32 --lora-modules jev-decision="$ADAPTER" \
   --logprobs-mode processed_logprobs --max-model-len 4096 --enable-prefix-caching --mamba-cache-mode align \
   --limit-mm-per-prompt '{"image": 2}' --max-num-seqs 8 --max-logprobs 256 --trust-request-chat-template \
-  --quantization fp8 --gpu-memory-utilization 0.92 --enforce-eager --port "$PORT" > "$LOG" 2>&1 < /dev/null &
+  --quantization fp8 --gpu-memory-utilization 0.88 --enforce-eager --port "$PORT" > "$LOG" 2>&1 < /dev/null &
 SRV=$!
 for i in $(seq 1 180); do
   curl -sf "http://localhost:$PORT/health" > /dev/null && break
