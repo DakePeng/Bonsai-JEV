@@ -78,6 +78,7 @@ def main():
     ap.add_argument("--split", default="test_set_30k")
     ap.add_argument("--data", default=os.path.expanduser("~/bonsai/data/jev-distill-corpus-v3"))
     ap.add_argument("--limit", type=int, default=0)
+    ap.add_argument("--shuffle", type=int, default=None, help="seed; shuffle rows before --limit")
     ap.add_argument("--skip-placeholder", action="store_true", help="drop yuri_v1 rows (placeholder [0.5,0.5] labels)")
     ap.add_argument("--model", default=os.path.expanduser("~/bonsai/models/bonsai2-27b/Ternary-Bonsai-2-27B-PQ2_0.gguf"))
     ap.add_argument("--tool", default=os.path.expanduser("~/bonsai/llama.cpp/build/bin/llama-decide-logits"))
@@ -89,6 +90,9 @@ def main():
     rows = [json.loads(l) for l in open(os.path.join(args.data, args.split + ".jsonl"))]
     if args.skip_placeholder:
         rows = [r for r in rows if r["source"] != "yuri_v1"]
+    if args.shuffle is not None:
+        import random
+        random.Random(args.shuffle).shuffle(rows)
     if args.limit:
         rows = rows[:args.limit]
     print(f"{len(rows)} rows", file=sys.stderr)
