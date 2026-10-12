@@ -260,7 +260,7 @@ def load_into(model_or_layer: nn.Module, b: Bonsai, names, strip_prefix: str, dt
         loaded.append(key)
     missing, unexpected = model_or_layer.load_state_dict(sd, strict=False)
     assert not unexpected, unexpected
-    model_or_layer.to(device)
+    model_or_layer.to(device=device, dtype=dtype)   # load_state_dict copies into fp32 params; cast after
     return loaded, missing
 
 
