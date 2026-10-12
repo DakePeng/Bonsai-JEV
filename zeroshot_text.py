@@ -32,6 +32,28 @@ def render(row):
             + "\n".join(lines) + "\n[decision]:")
 
 
+def load_split(data, split, skip_placeholder=True, shuffle=None, limit=0):
+    """Rows of a corpus split, with the same filtering/ordering everywhere (zeroshot, infer, calibrate, eval)."""
+    rows = [json.loads(l) for l in open(os.path.join(data, split + ".jsonl"))]
+    if skip_placeholder:
+        rows = [r for r in rows if r["source"] != "yuri_v1"]
+    if shuffle is not None:
+        import random
+        random.Random(shuffle).shuffle(rows)
+    if limit:
+        rows = rows[:limit]
+    return rows
+
+
+def active_probs(row, logits24, temps=None):
+    """Softmax over the kind's active slots, optionally divided by a per-kind temperature."""
+    lo, _ = RANGES[row["kind"]]
+    z = logits24[lo:lo + len(row["options"])]
+    if temps:
+        z = [v / temps[row["kind"]] for v in z]
+    return softmax(z)
+
+
 def softmax(z):
     m = max(z)
     e = [math.exp(v - m) for v in z]
@@ -88,14 +110,7 @@ def main():
     ap.add_argument("--resume", action="store_true", help="continue an interrupted run: skip rows already in the raw logits file")
     args = ap.parse_args()
 
-    rows = [json.loads(l) for l in open(os.path.join(args.data, args.split + ".jsonl"))]
-    if args.skip_placeholder:
-        rows = [r for r in rows if r["source"] != "yuri_v1"]
-    if args.shuffle is not None:
-        import random
-        random.Random(args.shuffle).shuffle(rows)
-    if args.limit:
-        rows = rows[:args.limit]
+    rows = load_split(args.data, args.split, args.skip_placeholder, args.shuffle, args.limit)
     print(f"{len(rows)} rows", file=sys.stderr)
 
     if args.from_logits:
@@ -124,10 +139,8 @@ def main():
         if "error" in o:
             skipped += 1
             continue
-        lo, hi = RANGES[r["kind"]]
-        z = o["logits"][lo:lo + len(r["options"])]
         kept.append(r)
-        probs.append(softmax(z))
+        probs.append(active_probs(r, o["logits"]))
     print(f"scored {len(kept)}, skipped {skipped} (too long)", file=sys.stderr)
 
     m = score(kept, probs)
