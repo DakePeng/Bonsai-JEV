@@ -133,6 +133,16 @@ One engineer, ~5 weeks. Rental hours in brackets.
    | src: openjev_v2 | 2,319 | 0.888 | 55.1% | 0.119 |
 
    This is the zero-shot floor: JEV-27B's trained KL is 0.017, JEV-9B's 0.019, i.e. 25× lower. The 600-row sample predicted it within noise. Scores are near chance (6-way), so the head and LoRA carry nearly all of the score-task skill.
+
+   **VL-RewardBench zero-shot (no LoRA, no head), demo protocol (both orders averaged), 1,247 pairs, 2026-10-12:**
+
+   | | general | hallucination | reasoning | **overall** | macro | order-agree |
+   |---|---:|---:|---:|---:|---:|---:|
+   | Bonsai 2 27B zero-shot | 60.2 | 78.9 | 72.2 | **74.5** | 70.5 | 50.9 |
+   | JEV-9B (published) | | | | 74.3 | | |
+   | JEV-27B-VL (published) | 58.0 | 83.2 | 78.2 | 78.3 | 73.1 | 89 |
+
+   Reading: the ternary base's vision understanding is intact (the plan's "三值化损伤了视觉理解" risk is not showing), and the averaged protocol already lands at JEV-9B level. But order-agree 50.9% vs JEV's 89% says the raw base has a dominant position bias: each single order is nearly a coin flip, and the accuracy comes from the small residual that survives averaging. Training the head/LoRA should mostly fix the bias; single-order accuracy and order-agree are the numbers to watch in P3, not just the averaged overall. ~0.7 s per decision on the 4070 (300 image tokens + ~250 text tokens).
 10b. **Prepared 2026-10-12, queued after 10 in `run_step10.sh`.** `run_10b.sh` serves the multimodal Qwen3.5-9B base + `vl/adapter_vllm` through JEV-9B's own `vl/serve_decide.py` (vLLM 0.31, FP8, 4k context, eager, 8 seqs) and `jev9b_eval.py` runs text + VL-RewardBench through the demo's unmodified client (`JEV_BACKEND=decide`). Weights from ModelScope (JEV-9B 18 GB, Qwen3.5-9B 19 GB; note the 9B serve script pins base revision c202236, ModelScope gave latest). Risk: 12 GB may not fit; fallback is ~¥15 on the rented card.
     **JEV-9B FP8 on the 4070, two jobs in one.** vLLM FP8, `--max-model-len 8192`, using the JEV-27B-DEMO eval code unchanged. (a) Lower-bound gate: KL, ECE, robot-arm demo success. (b) **Harness validation:** if it reproduces the published 74.3% VL-RewardBench and ~0.019 KL, the eval code is trusted and JEV-27B-VL's published 78.3% / AUROC 0.91 / KL 0.017 are used directly as targets. No teacher rerun needed.
 11. **Hybrid-attention training kernels** [same session]: confirm PyTorch and Triton see sm_120, then run one forward+backward on the PyTorch model with LoRA attached and gradient checkpointing, micro-batch 24k tokens. Record step time and peak memory. This confirms the P2 time estimate.
