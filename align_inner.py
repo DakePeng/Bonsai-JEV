@@ -69,7 +69,7 @@ def main():
 
     def cmp(fork_name, hf_name, width=None, fn=lambda t: t):
         got = cap[hf_name]
-        got = got.reshape(-1, got.shape[-1]) if got.dim() == 3 else got
+        got = got.reshape(-1, got.shape[-1])
         ref = load_dump(args.dump, fork_name, width or got.shape[-1])
         if ref is None:
             print(f"{fork_name:24s} (no dump)")
