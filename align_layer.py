@@ -82,7 +82,8 @@ def main():
         with torch.no_grad():
             y = layer(x[None].to(dev, dtype), position_embeddings=position_embeddings,
                       attention_mask=masks[cfg.layer_types[i]], position_ids=text_pos)
-        worst = max(worst, report(f"l_out-{i} {cfg.layer_types[i][:4]}", y[0], ref))
+        # the fork computes the last layer only for output tokens (ne=[E,1]); compare the matching tail
+        worst = max(worst, report(f"l_out-{i} {cfg.layer_types[i][:4]}", y[0, -ref.shape[0]:], ref))
         del layer, y
         torch.cuda.empty_cache()
 
