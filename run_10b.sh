@@ -1,6 +1,9 @@
 #!/bin/bash
-# Step 10b on the 4070 (WSL2, 12 GB): JEV-9B FP8 via vLLM + the demo's serve_decide.py, then text and
-# VL-RewardBench evals through the demo's own client. Called by run_step10.sh after the Bonsai baselines.
+# Step 10b: JEV-9B via vLLM + JEV's own vl/serve_decide.py, then text and VL-RewardBench evals through the
+# demo's unmodified client. Does NOT fit the 4070 (fp8 leaves embeddings/lm_head/vision in bf16: 11.03 GiB
+# model footprint, no room for KV cache). Run on the rented PRO 6000 at the start of the first session:
+#   QUANT=fp8 GPU_UTIL=0.9 bash run_10b.sh      (FP8, the configuration the original 20.97 baseline used)
+#   QUANT=none bash run_10b.sh                  (BF16 reference, ~1 min more)
 # Pattern from JEV-27B-DEMO/common/serve_jev27b_mm.sh; JEV-9B's language weights are bit-identical to
 # Qwen3.5-9B, so the multimodal base + vl/adapter_vllm is the JEV-9B-VL System 1.
 set -u
@@ -9,6 +12,9 @@ mkdir -p results
 BASE=~/bonsai/models/qwen3.5-9b
 ADAPTER=~/bonsai/models/jev-9b/vl/adapter_vllm
 PORT=${PORT:-8000}
+QUANT=${QUANT:-fp8}
+GPU_UTIL=${GPU_UTIL:-0.9}
+QFLAG=""; [ "$QUANT" != "none" ] && QFLAG="--quantization $QUANT"
 LOG=results/jev9b_server.log
 
 if [ ! -f "$BASE/config.json" ] || [ ! -f "$ADAPTER/adapter_model.safetensors" ]; then
@@ -23,7 +29,7 @@ setsid nohup python3 ~/bonsai/models/jev-9b/vl/serve_decide.py --model "$BASE" -
   --enable-lora --max-lora-rank 32 --lora-modules jev-decision="$ADAPTER" \
   --logprobs-mode processed_logprobs --max-model-len 4096 --enable-prefix-caching --mamba-cache-mode align \
   --limit-mm-per-prompt '{"image": 2}' --max-num-seqs 8 --max-logprobs 256 --trust-request-chat-template \
-  --quantization fp8 --gpu-memory-utilization 0.88 --enforce-eager --port "$PORT" > "$LOG" 2>&1 < /dev/null &
+  $QFLAG --gpu-memory-utilization "$GPU_UTIL" --port "$PORT" > "$LOG" 2>&1 < /dev/null &
 SRV=$!
 for i in $(seq 1 180); do
   curl -sf "http://localhost:$PORT/health" > /dev/null && break
@@ -37,10 +43,10 @@ export JEV_URL="http://localhost:$PORT" JEV_BACKEND=decide
 . ~/bonsai/venv/bin/activate   # eval scripts run in the main venv (pandas etc.); client only needs requests
 pip show requests > /dev/null 2>&1 || pip install -q -i https://pypi.tuna.tsinghua.edu.cn/simple requests
 echo "[$(date +%T)] 10b text"
-python3 jev9b_eval.py text --out results/jev9b_text > results/jev9b_text.log 2>&1
-grep -E "^(all|noul|score|choice|src)" results/jev9b_text.log
+python3 jev9b_eval.py text --out results/jev9b_${QUANT}_text > results/jev9b_${QUANT}_text.log 2>&1
+grep -E "^(all|noul|score|choice|src)" results/jev9b_${QUANT}_text.log
 echo "[$(date +%T)] 10b VL-RewardBench"
-python3 jev9b_eval.py vlrb --out results/jev9b_vlrb > results/jev9b_vlrb.log 2>&1
-grep -E "acc=" results/jev9b_vlrb.log
+python3 jev9b_eval.py vlrb --out results/jev9b_${QUANT}_vlrb > results/jev9b_${QUANT}_vlrb.log 2>&1
+grep -E "acc=" results/jev9b_${QUANT}_vlrb.log
 kill $SRV 2>/dev/null; sleep 5; pkill -f "[s]erve_decide.py" 2>/dev/null
 echo "[$(date +%T)] 10b done"
