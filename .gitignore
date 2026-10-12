@@ -1,0 +1,5 @@
+models/
+*.gguf
+*.safetensors
+__pycache__/
+*.log
