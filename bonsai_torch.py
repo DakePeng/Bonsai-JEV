@@ -282,21 +282,33 @@ def build_layer(b: Bonsai, cfg, li: int, dtype=torch.bfloat16, device="cuda"):
     return layer
 
 
-def build_model(b: Bonsai, cfg, dtype=torch.bfloat16, device="cuda"):
-    """Full text model (54 GB in BF16). Embedding and lm_head are Hadamard modules too."""
+def build_model(b: Bonsai, cfg, dtype=torch.bfloat16, device="cuda", n_layers=None):
+    """Text model without lm_head (Qwen3_5TextModel; ~51 GB in BF16 for 64 layers). Returns final-norm
+    hidden states. n_layers truncates the stack (for smoke tests on small GPUs / CPU)."""
+    import copy
     from transformers.models.qwen3_5 import modeling_qwen3_5 as M
+    if n_layers is not None:
+        cfg = copy.deepcopy(cfg)
+        cfg.num_hidden_layers = n_layers
+        cfg.layer_types = cfg.layer_types[:n_layers]
     with torch.device("meta"):
-        model = M.Qwen3_5ForCausalLM(cfg)
+        model = M.Qwen3_5TextModel(cfg)
     model = model.to_empty(device="cpu")
-    emb = HadamardEmbedding(cfg.vocab_size, cfg.hidden_size, b.signs[cfg.hidden_size], b.H, dtype)
-    model.model.embed_tokens = emb
-    names = [n for n in b.t if n not in ("output.weight",)]  # lm_head handled with the rest via folded set
-    names.append("output.weight")
-    loaded, missing = load_into(model, b, names, "", dtype, device)
-    # rotary buffers etc. are non-persistent and were created on meta; rebuild them
-    model.model.rotary_emb = type(model.model.rotary_emb)(cfg, device=device)
-    assert all(m.startswith("model.rotary_emb") or "inv_freq" in m for m in missing), missing
+    model.embed_tokens = HadamardEmbedding(cfg.vocab_size, cfg.hidden_size, b.signs[cfg.hidden_size], b.H, dtype)
+    keep = [n for n in b.t if n != "output.weight" and (not n.startswith("blk.") or int(n.split(".")[1]) < cfg.num_hidden_layers)]
+    loaded, missing = load_into(model, b, keep, "model.", dtype, device)
+    model.rotary_emb = type(model.rotary_emb)(cfg, device=device)   # non-persistent buffers were created on meta
+    assert all("rotary_emb" in m or "inv_freq" in m for m in missing), missing
     return model
+
+
+def decision_head_rows(b: Bonsai, token_ids) -> torch.Tensor:
+    """lm_head rows for the verbalizer tokens, un-rotated so the head consumes the raw final-norm hidden
+    state: logit = w_rot . H(s*h) = (s * H w_rot) . h. Returns (len(token_ids), hidden) fp32."""
+    t = b.t["output.weight"]
+    raw = np.asarray(t.data)[np.asarray(token_ids)]
+    w = dequant_pq2_0(raw, len(token_ids), b.n_embd)
+    return hadamard_blocks(w, b.H) * b.signs[b.n_embd]
 
 
 # ----------------------------------------------------------------------------- self-check
@@ -329,6 +341,13 @@ def _selfcheck(gguf_path: str):
     assert set(b.signs) == {5120, 6144, 17408}
     idx = tiled_to_grouped(16, 48)
     assert sorted(idx.tolist()) == list(range(48)) and idx[1].item() == 16 and idx[3].item() == 1
+    # 4b. un-rotated head rows == rotated lm_head on a random hidden state
+    ids = [3721, 1802, 32]
+    rows = decision_head_rows(b, ids)
+    h = torch.randn(2, b.n_embd)
+    w_rot = dequant_pq2_0(np.asarray(b.t["output.weight"].data)[np.asarray(ids)], 3, b.n_embd)
+    ref = hadamard_blocks(h * b.signs[b.n_embd], b.H) @ w_rot.T
+    assert torch.allclose(h @ rows.T, ref, atol=1e-3), (h @ rows.T - ref).abs().max()
     # 5. every tensor name maps
     for n in b.t:
         hf_name(n)
