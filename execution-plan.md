@@ -99,6 +99,8 @@ One engineer, ~5 weeks. Rental hours in brackets.
 
 **Gate:** both local runtimes produce sane text; numbers recorded.
 
+**Measured 2026-10-12, 4070 12GB, PQ2_0, fork commit e8fd209, CUDA 12.0, WSL2:** `llama-bench` pp512 = **1226 tok/s**, tg128 = **49.6 tok/s**. Matches the pre-run estimate (1000–1300 / ~45). Implied single-decision latency: ~0.25 s for 300 text tokens, ~0.4 s for a 640×480 image + question before vision-encoder time.
+
 ### Week 1 — P0 feasibility
 
 6. **Dequant + Hadamard PyTorch model.** Write `bonsai_torch.py`: load ternary codes and scales, dequant to BF16 `(code-1)*scale`, wrap each linear so that `y = W_rot · H(s⊙Px) + B·A·x` with the per-weight permutation, signs, and block-1024 normalized Sylvester Walsh-Hadamard read from the GGUF `prism.hadamard.*` metadata. Base path rotated, LoRA path raw, exactly as the fork does it. Reuse the HF Qwen3.8 model class; only swap the linear layers.

@@ -99,6 +99,8 @@
 
 **过关标准：** 本地运行时能输出正常文本；数字记下来了。
 
+**2026-10-12 实测，4070 12GB，PQ2_0，分支 commit e8fd209，CUDA 12.0，WSL2：** `llama-bench` pp512 = **1226 tok/s**，tg128 = **49.6 tok/s**。和事前估算（1000–1300 / 约 45）一致。推算单次决策延迟：300 token 纯文本约 0.25 秒，640×480 图加问题约 0.4 秒，不含视觉编码器时间。
+
 ### 第 1 周 — P0 可行性
 
 6. **解包 + Hadamard 的 PyTorch 模型。** 写 `bonsai_torch.py`：加载三值码和缩放因子，按 `(code-1)*scale` 解包成 BF16，给每个线性层包成 `y = W_rot · H(s⊙Px) + B·A·x`，其中每个权重的排列、符号、按 1024 分块的归一化 Sylvester Walsh-Hadamard 都从 GGUF 的 `prism.hadamard.*` 元数据读。底座路径旋转，LoRA 路径不旋转，和分支完全一致。复用 HF 的 Qwen3.8 模型类，只换线性层。
