@@ -50,7 +50,9 @@ def main():
     print(f"{n} tokens, dtype {args.dtype}")
 
     # --- embedding: dequantize only the looked-up rows, then inverse-after-lookup s * H(z)
-    inp = load_dump(args.dump, "inp_embd", E)
+    inp = load_dump(args.dump, "model.input_embed", E)
+    if inp is None:
+        inp = load_dump(args.dump, "inp_embd", E)
     raw = np.asarray(b.t["token_embd.weight"].data)[tokens.numpy()]
     z = dequant_pq2_0(raw, n, E)
     emb = hadamard_blocks(z, b.H) * b.signs[E]
