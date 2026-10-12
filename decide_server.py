@@ -27,7 +27,18 @@ from pydantic import BaseModel
 from zeroshot_text import RANGES, VERBALIZER_IDS, as_text
 
 LLAMA_URL = os.environ.get("LLAMA_URL", "http://localhost:8080").rstrip("/")
-MARKER = "<__media__>"
+_http = requests.Session()
+_marker = None
+
+
+def marker():
+    """This fork's llama-server randomises its media marker per run (see /props, or pin LLAMA_MEDIA_MARKER)."""
+    global _marker
+    if _marker is None:
+        _marker = _http.get(f"{LLAMA_URL}/props", timeout=10).json().get("media_marker", "<__media__>")
+    return _marker
+
+
 LETTERS = "ABCDEFGHIJKLMNOP"
 MODEL_NAME = os.environ.get("DECIDE_MODEL_NAME", "bonsai2-27b-decision")
 
@@ -35,7 +46,6 @@ _dj = os.environ.get("DECISION_JSON")
 DEC = json.load(open(_dj)) if _dj else {}
 BIAS = DEC.get("head_bias", [0.0] * 24)
 TEMPS = DEC.get("per_kind_temperature", {})
-_http = requests.Session()
 app = FastAPI()
 
 
@@ -61,7 +71,7 @@ def render(kind, state, question, options):
     for p in (state if isinstance(state, list) else [state]):
         if isinstance(p, dict) and "image" in p:
             images.append(_image_b64(p["image"]))
-            text += MARKER
+            text += marker()
         else:
             text += as_text(p)
     lines = options if kind != "choice" else [f"{LETTERS[i]}) {o}" for i, o in enumerate(options)]
