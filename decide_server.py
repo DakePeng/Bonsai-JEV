@@ -99,7 +99,7 @@ def decide(req: DecideRequest):
     prompt, images = render(kind, req.state, req.question, options)
     body = {
         "prompt": {"prompt_string": prompt, "multimodal_data": images} if images else prompt,
-        "n_predict": 1, "n_probs": 200, "post_sampling_probs": False, "cache_prompt": True,
+        "n_predict": 1, "n_probs": 1000, "post_sampling_probs": False, "cache_prompt": True,
         "temperature": 1.0, "top_k": 0, "top_p": 1.0, "min_p": 0.0, "samplers": [],
     }
     r = _http.post(f"{LLAMA_URL}/completion", json=body, timeout=600)
