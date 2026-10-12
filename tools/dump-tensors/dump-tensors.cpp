@@ -18,9 +18,20 @@ struct dump_ctx {
     std::string dir;
 };
 
+// DUMP_LAYERS="1,3" additionally dumps every tensor whose name ends in "-1" or "-3" (per-layer intermediates)
+static std::vector<std::string> g_layer_suffixes;
+
 static bool wanted(const char * name) {
     std::string n(name);
-    return n == "inp_embd" || n == "result_norm" || n == "result_output" || n.rfind("l_out-", 0) == 0;
+    if (n == "inp_embd" || n == "embd" || n == "result_norm" || n == "result_output" || n.rfind("l_out-", 0) == 0) {
+        return true;
+    }
+    for (const auto & suf : g_layer_suffixes) {
+        if (n.size() > suf.size() && n.compare(n.size() - suf.size(), suf.size(), suf) == 0) {
+            return true;
+        }
+    }
+    return false;
 }
 
 static bool dump_cb(struct ggml_tensor * t, bool ask, void * user_data) {
@@ -79,6 +90,18 @@ int main(int argc, char ** argv) {
     dump_ctx d;
     const char * env = std::getenv("DUMP_DIR");
     d.dir = env ? env : ".";
+    if (const char * ls = std::getenv("DUMP_LAYERS")) {
+        std::string cur;
+        for (const char * p = ls; ; ++p) {
+            if (*p == ',' || *p == 0) {
+                if (!cur.empty()) g_layer_suffixes.push_back("-" + cur);
+                cur.clear();
+                if (*p == 0) break;
+            } else {
+                cur += *p;
+            }
+        }
+    }
 
     common_params params;
     common_init();
