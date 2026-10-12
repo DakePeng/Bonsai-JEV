@@ -113,7 +113,11 @@
 ### 第 1 周 — P0 可行性
 
 6. **解包 + Hadamard 的 PyTorch 模型。** 写 `bonsai_torch.py`：加载三值码和缩放因子，按 `(code-1)*scale` 解包成 BF16，给每个线性层包成 `y = W_rot · H(s⊙Px) + B·A·x`，其中每个权重的排列、符号、按 1024 分块的归一化 Sylvester Walsh-Hadamard 都从 GGUF 的 `prism.hadamard.*` 元数据读。底座路径旋转，LoRA 路径不旋转，和分支完全一致。复用 HF 的 Qwen3.8 模型类，只换线性层。
-7. **在 4070 上逐层对齐，不租卡。** 用分支的 `llama-eval-callback` 对 20 个 prompt 导出每个 block 之后的隐藏状态。然后在 PyTorch 里一次加载一层 BF16（每层约 0.85 GB），喂导出的输入隐藏状态，比较输出。目标：最大绝对差在 BF16 噪声范围内。这样能把错误定位到某一层，花费 $0。
+7. **在 4070 上逐层对齐，不租卡。2026-10-12 第 0–4 层和输出头已完成；全量扫描进行中。** 工具：`tools/dump-tensors`（分支的 example，导出 `model.input_embed`、`l_out-N`、`result_norm`、`result_output`，加 `DUMP_LAYERS=1,3` 时还导出这些层的所有中间张量，raw f32）、`align_layer.py`（一次一层，fp32 能放进 12 GB）、`align_inner.py`（层内逐投影对比）。用这套工具找到并修了三个只看 logits 看不出来的 bug：
+   - **零中心 RMSNorm。** HF 的 `Qwen3_5RMSNorm` 乘的是 `(1 + w)`，GGUF 里存的已经是 `w + 1`。`attn_norm`、`post_attention_norm`、`q_norm`、`k_norm`、`output_norm` 都要减 1。带门控的 `ssm_norm` 是普通权重。
+   - **线性注意力的 value 头顺序。** `gdn_v_grouped=true`：分支原生的 v 头顺序是 tiled（`h = k + nk·r`），HF 是 grouped（`h = r + rep·k`）。GGUF 里按 v 头存的张量（`attn_qkv` 的 v 行、`attn_gate`/z、`ssm_alpha`、`ssm_beta`、`ssm_dt`、`ssm_a`、`ssm_conv1d` 的 v 通道）是 tiled 顺序，给 HF 用要重排。`ssm_out` 的列已经是 grouped（分支是对激活做排列），所以 `perm_for()` 保持恒等。
+   - **单独使用的 HF 层必须钉死 `_attn_implementation`**（sdpa）。不设的话 mask 构造器返回空，eager 回退路径会做非因果注意力。
+   结果：每个投影和分支的差约 1e-3（分支内核是降精度计算），归一化层 1e-7，层输出 3.5e-4（线性注意力）和 5.9e-4（全注意力），lm_head logits 2e-3，argmax 100% 一致。
 8. **全模型对齐** [PRO 6000 ×1，3–4 小时]：跑完整的 PyTorch 模型，用同样 20 个 prompt 和分支比较最终 logits。
 9. **检查 llama.cpp 里的 LoRA 位置。2026-10-12 已完成。** LoRA 的输入在 **Hadamard 之前**（原始 `cur`），底座的输入在 Hadamard 之后。另外发现：分支按权重张量逐个从 GGUF 的 `prism.hadamard.*` 键注册旋转，部分权重在符号和 Hadamard 之前还有一个特征排列（`perm_rep`，GDN v 分组），符号在变换之前乘。`bonsai_torch.py` 必须读这些键，只在底座路径上复现 P → ⊙s → H 这条流水线。
 10. **在 4070 上测零样本基线。** 不挂 LoRA，直接读字母 logits。用分支跑 `test_set_30k`（原版 Jev 标注的部分）的文本 KL 和 VL-RewardBench。这是训练后模型必须超过的下限。
