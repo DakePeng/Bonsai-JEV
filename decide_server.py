@@ -143,7 +143,7 @@ def decide(req: DecideRequest):
     probs = [v / sum(e) for v in e]
     ci = max(range(len(probs)), key=lambda i: probs[i])
     out = {"kind": kind, "options": options, "probabilities": probs, "choice_index": ci, "choice": options[ci],
-           "elapsed_seconds": round(time.time() - t0, 4), "n_prompt_tokens": j.get("tokens_evaluated"),
+           "elapsed_seconds": round(time.time() - t0, 4), "n_prompt_tokens": j.get("timings", {}).get("prompt_n"),
            "n_cached": j.get("timings", {}).get("cache_n"), "model": MODEL_NAME, "protocol": "jev27-bare-v1"}
     if req.debug:
         out["debug"] = {"logprobs": [top.get(t) for t in ids], "bias": BIAS[lo:lo + len(ids)], "temperature": T,
