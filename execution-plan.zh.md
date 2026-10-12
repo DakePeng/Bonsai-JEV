@@ -121,7 +121,18 @@
 8. **全模型对齐** [PRO 6000 ×1，3–4 小时]：跑完整的 PyTorch 模型，用同样 20 个 prompt 和分支比较最终 logits。
 9. **检查 llama.cpp 里的 LoRA 位置。2026-10-12 已完成。** LoRA 的输入在 **Hadamard 之前**（原始 `cur`），底座的输入在 Hadamard 之后。另外发现：分支按权重张量逐个从 GGUF 的 `prism.hadamard.*` 键注册旋转，部分权重在符号和 Hadamard 之前还有一个特征排列（`perm_rep`，GDN v 分组），符号在变换之前乘。`bonsai_torch.py` 必须读这些键，只在底座路径上复现 P → ⊙s → H 这条流水线。
 10. **在 4070 上测零样本基线。** 不挂 LoRA，直接读字母 logits。用分支跑 `test_set_30k`（原版 Jev 标注的部分）的文本 KL 和 VL-RewardBench。这是训练后模型必须超过的下限。
-   **文本部分，2026-10-12 进行中。** 方法按 JEV 的 `bare-v1` 模板钉死（来自 `common/jev_client.py` 和 `judge_config.json`）：`[kind] k\n[state] s\n[question] q\n[options]\n<行>\n[decision]:`，不加特殊 token，选项行为 `false`/`true`、`0`–`5`、`A) …`；verbalizer id 3721、1802、15–20、32–47（已验证在 Qwen3.8 分词器里完全相同）；在该类型的有效 id 上做 softmax，不加偏置，温度 1。工具：`tools/decide-logits`（分支 example，输出指定 id 的下一 token logits，4070 上约 0.18 秒/行）加 `zeroshot_text.py`（按类型和来源算 KL、准确率、ECE；逐行概率存下来，供之后训练后模型和底座对比）。`yuri_v1` 的行是 `[0.5,0.5]` 占位标签，已排除。600 行随机样本：总 KL 0.46（noul 0.13 / choice 0.60 / score 0.72），准确率 noul 82%、choice 48%、score 13%。其余约 2.77 万行正在跑。
+   **文本部分，2026-10-12 进行中。** 方法按 JEV 的 `bare-v1` 模板钉死（来自 `common/jev_client.py` 和 `judge_config.json`）：`[kind] k\n[state] s\n[question] q\n[options]\n<行>\n[decision]:`，不加特殊 token，选项行为 `false`/`true`、`0`–`5`、`A) …`；verbalizer id 3721、1802、15–20、32–47（已验证在 Qwen3.8 分词器里完全相同）；在该类型的有效 id 上做 softmax，不加偏置，温度 1。工具：`tools/decide-logits`（分支 example，输出指定 id 的下一 token logits，4070 上约 0.18 秒/行）加 `zeroshot_text.py`（按类型和来源算 KL、准确率、ECE；逐行概率存下来，供之后训练后模型和底座对比）。`yuri_v1` 的行是 `[0.5,0.5]` 占位标签，已排除。**全量结果，27,695 行（`test_set_30k` 去掉占位行后的全部），2026-10-12：**
+
+   | 子集 | n | KL | 准确率 | ECE |
+   |---|---:|---:|---:|---:|
+   | 全部 | 27,695 | **0.481** | 49.0% | 0.036 |
+   | noul | 9,969 | 0.167 | 76.6% | 0.058 |
+   | choice | 9,199 | 0.595 | 49.4% | 0.088 |
+   | score | 8,527 | 0.724 | 16.4% | 0.074 |
+   | 来源 yuri_v3（Jev 标注） | 25,376 | 0.443 | 48.5% | 0.042 |
+   | 来源 openjev_v2 | 2,319 | 0.888 | 55.1% | 0.119 |
+
+   这就是零样本下限：JEV-27B 训练后的 KL 是 0.017，JEV-9B 是 0.019，低 25 倍。600 行样本的预测在噪声范围内。打分题接近随机（6 选 1），说明打分能力几乎全靠决策头和 LoRA。
 10b. **2026-10-12 已准备好，排在 `run_step10.sh` 里第 10 步之后自动跑。** `run_10b.sh` 用 JEV-9B 自带的 `vl/serve_decide.py`（vLLM 0.31，FP8，4k 上下文，eager，8 并发）服务多模态 Qwen3.5-9B 底座 + `vl/adapter_vllm`，`jev9b_eval.py` 通过 demo 仓库原封不动的客户端（`JEV_BACKEND=decide`）跑文本和 VL-RewardBench。权重来自 ModelScope（JEV-9B 18 GB，Qwen3.5-9B 19 GB；注意 9B 的 serve 脚本钉死了底座版本 c202236，ModelScope 给的是最新版）。风险：12 GB 可能放不下；备选是在租的卡上花约 ¥15。
     **在 4070 上跑 JEV-9B FP8，一次干两件事。** vLLM FP8，`--max-model-len 8192`，原封不动用 JEV-27B-DEMO 的评测代码。(a) 下限门槛：KL、ECE、机械臂 demo 成功率。(b) **评测代码校验：** 如果复现出公开的 VL-RewardBench 74.3% 和 KL 约 0.019，评测代码就可信，JEV-27B-VL 公开的 78.3% / AUROC 0.91 / KL 0.017 直接拿来当目标。不需要重跑教师模型。
 11. **混合注意力的训练内核** [同一次会话]：先确认 PyTorch 和 Triton 都认出 sm_120，再给 PyTorch 模型挂上 LoRA，开梯度检查点，micro-batch 24k token，跑一次前向加反向。记录单步时间和峰值显存。用来确认 P2 的时间估算。
