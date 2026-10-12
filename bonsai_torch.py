@@ -267,7 +267,10 @@ def load_into(model_or_layer: nn.Module, b: Bonsai, names, strip_prefix: str, dt
 def text_config(cfg_dir: str):
     from transformers import AutoConfig
     cfg = AutoConfig.from_pretrained(cfg_dir)
-    return getattr(cfg, "text_config", cfg)
+    cfg = getattr(cfg, "text_config", cfg)
+    # standalone layers: masks and the attention interface must agree, otherwise eager runs unmasked
+    cfg._attn_implementation = "sdpa"
+    return cfg
 
 
 def build_layer(b: Bonsai, cfg, li: int, dtype=torch.bfloat16, device="cuda"):
