@@ -54,7 +54,11 @@ def main():
     raw = np.asarray(b.t["token_embd.weight"].data)[tokens.numpy()]
     z = dequant_pq2_0(raw, n, E)
     emb = hadamard_blocks(z, b.H) * b.signs[E]
-    report("inp_embd", emb, inp)
+    if inp is None:
+        print("inp_embd not dumped; using the PyTorch embedding as layer-0 input")
+        inp = emb
+    else:
+        report("inp_embd", emb, inp)
 
     # --- position ids / rope / masks, exactly as Qwen3_5TextModel.forward builds them
     from transformers.masking_utils import create_causal_mask, create_recurrent_attention_mask
