@@ -51,6 +51,7 @@ def main():
                      "linear_attn.norm": False, "linear_attn.norm.in": True})
     else:
         subs.update({"self_attn.q_proj": False, "self_attn.k_proj": False, "self_attn.v_proj": False,
+                     "self_attn.q_norm": False, "self_attn.k_norm": False,
                      "self_attn.o_proj": False, "self_attn.o_proj.in": True})
     for name, want_in in subs.items():
         layer.get_submodule(name[:-3] if want_in else name).register_forward_hook(hook(name, want_in))
@@ -89,12 +90,31 @@ def main():
         conv = F.conv1d(F.pad(qkv, (w.shape[-1] - 1, 0)), w, groups=w.shape[0])
         ref = load_dump(args.dump, "conv_output_silu" + s, w.shape[0])
         report("conv_output_silu" + s, F.silu(conv)[0].T, ref)
-        cmp("final_output" + s, "linear_attn.out_proj.in")
+        # fork's final_output is in its tiled head order; HF's out_proj input is grouped
+        from bonsai_torch import tiled_to_grouped
+        ref_t = load_dump(args.dump, "final_output" + s, b.nv * b.hd).reshape(n, b.nv, b.hd)
+        ref_g = ref_t[:, tiled_to_grouped(b.nk, b.nv)].reshape(n, -1)
+        report("final_output(grp)" + s, cap["linear_attn.out_proj.in"].reshape(n, -1), ref_g)
         cmp("linear_attn_out" + s, "linear_attn.out_proj")
     else:
         cmp("Qcur_full" + s, "self_attn.q_proj")
         cmp("Kcur" + s, "self_attn.k_proj")
         cmp("Vcur" + s, "self_attn.v_proj")
+        cmp("Qcur_normed" + s, "self_attn.q_norm", width=256)
+        cmp("Kcur_normed" + s, "self_attn.k_norm", width=256)
+        # rope + attention + gate recomputed from the captured, normed q/k and raw v
+        sa = layer.self_attn
+        q = cap["self_attn.q_norm"].reshape(1, n, -1, 256).transpose(1, 2)
+        k = cap["self_attn.k_norm"].reshape(1, n, -1, 256).transpose(1, 2)
+        v = cap["self_attn.v_proj"].reshape(1, n, -1, 256).transpose(1, 2)
+        q, k = M.apply_rotary_pos_emb(q, k, *pe)
+        report("Qcur(rope)" + s, q[0].transpose(0, 1).reshape(n, -1), load_dump(args.dump, "Qcur" + s, 256).reshape(n, -1))
+        att = F.scaled_dot_product_attention(q, k.repeat_interleave(q.shape[1] // k.shape[1], 1),
+                                             v.repeat_interleave(q.shape[1] // v.shape[1], 1), is_causal=True)
+        att = att.transpose(1, 2).reshape(n, -1)
+        report("attn_pregate" + s, att, load_dump(args.dump, "attn_pregate" + s, att.shape[-1]))
+        gate = torch.chunk(cap["self_attn.q_proj"].reshape(n, -1, 512), 2, dim=-1)[1].reshape(n, -1)
+        report("gate_sigmoid" + s, torch.sigmoid(gate), load_dump(args.dump, "gate_sigmoid" + s, gate.shape[-1]))
         cmp("attn_gated" + s, "self_attn.o_proj.in")
         cmp("attn_output" + s, "self_attn.o_proj")
     cmp("attn_residual" + s, "post_attention_layernorm.in")

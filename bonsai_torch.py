@@ -122,6 +122,9 @@ class Bonsai:
             off += w
         assert off == len(values)
         self.gdn_v_grouped = bool(_field(self.r, "prism.hadamard.gdn_v_grouped"))
+        self.nk = _field(self.r, "qwen35.ssm.group_count")        # linear-attn key heads
+        self.nv = _field(self.r, "qwen35.ssm.time_step_rank")     # linear-attn value heads
+        self.hd = _field(self.r, "qwen35.ssm.state_size")         # head dim
         self.n_layer = _field(self.r, "qwen35.block_count")
         self.n_embd = _field(self.r, "qwen35.embedding_length")
 
@@ -189,14 +192,36 @@ _ZERO_CENTERED_NORMS = ("attn_norm.weight", "post_attention_norm.weight", "attn_
                         "attn_k_norm.weight", "output_norm.weight")
 
 
-def hf_value(gguf_name: str, w: torch.Tensor) -> torch.Tensor:
+def tiled_to_grouped(nk: int, nv: int) -> torch.Tensor:
+    """Value-head order. Fork (tiled): head = k + nk*r. HF (grouped): head = r + rep*k, rep = nv//nk.
+    Returns idx such that hf_tensor[h_hf] = fork_tensor[idx[h_hf]]."""
+    rep = nv // nk
+    return torch.tensor([(h // rep) + nk * (h % rep) for h in range(nv)])
+
+
+def hf_value(gguf_name: str, w: torch.Tensor, b: "Bonsai | None" = None) -> torch.Tensor:
     """GGUF storage conventions -> HF conventions."""
     if gguf_name.endswith("ssm_a"):
-        return torch.log(-w)                 # GGUF stores -exp(A_log)
+        w = torch.log(-w)                    # GGUF stores -exp(A_log)
     if gguf_name.endswith("ssm_conv1d.weight"):
+        if b is not None and b.gdn_v_grouped:
+            kd = b.nk * b.hd
+            v = w[2 * kd:].reshape(b.nv, b.hd, -1)[tiled_to_grouped(b.nk, b.nv)].reshape(-1, w.shape[1])
+            w = torch.cat([w[:2 * kd], v], 0)
         return w.unsqueeze(1)                # (conv_dim, k) -> (conv_dim, 1, k)
     if gguf_name.endswith(_ZERO_CENTERED_NORMS):
         return w - 1                         # HF Qwen3_5RMSNorm applies (1 + w); GGUF has the +1 baked in
+    # per-value-head tensors are stored in the fork's tiled head order when gdn_v_grouped
+    if b is not None and b.gdn_v_grouped:
+        idx = tiled_to_grouped(b.nk, b.nv)
+        if gguf_name.endswith(("ssm_a", "ssm_dt.bias", "ssm_alpha.weight", "ssm_beta.weight")):
+            return w[idx]
+        if gguf_name.endswith("attn_gate.weight"):                       # z: (nv*hd, E)
+            return w.reshape(b.nv, b.hd, -1)[idx].reshape(w.shape)
+        if gguf_name.endswith("attn_qkv.weight"):                        # [q | k | v] rows; only v is per-v-head
+            kd = b.nk * b.hd
+            v = w[2 * kd:].reshape(b.nv, b.hd, -1)[idx].reshape(-1, w.shape[1])
+            return torch.cat([w[:2 * kd], v], 0)
     return w                                 # ssm_norm (RMSNormGated) is a plain weight
 
 
@@ -226,7 +251,7 @@ def load_into(model_or_layer: nn.Module, b: Bonsai, names, strip_prefix: str, dt
         key = hf_name(g)
         assert key.startswith(strip_prefix), (key, strip_prefix)
         key = key[len(strip_prefix):]
-        w = hf_value(g, b.tensor(g))
+        w = hf_value(g, b.tensor(g), b)
         if g in b.folded:
             parent_path, child = key.rsplit(".", 2)[0], key.rsplit(".", 2)[1]
             parent = model_or_layer.get_submodule(parent_path) if parent_path else model_or_layer
@@ -299,6 +324,8 @@ def _selfcheck(gguf_path: str):
     assert hf_value("blk.0.ssm_conv1d.weight", b.tensor("blk.0.ssm_conv1d.weight")).shape == (10240, 1, 4)
     assert "output.weight" in b.folded and "token_embd.weight" in b.inverse
     assert set(b.signs) == {5120, 6144, 17408}
+    idx = tiled_to_grouped(16, 48)
+    assert sorted(idx.tolist()) == list(range(48)) and idx[1].item() == 16 and idx[3].item() == 1
     # 5. every tensor name maps
     for n in b.t:
         hf_name(n)
