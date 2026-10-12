@@ -14,7 +14,7 @@ import numpy as np
 import torch
 
 from bonsai_torch import (Bonsai, HadamardLinear, build_layer, dequant_pq2_0, hadamard_blocks,
-                          text_config)
+                          hf_value, text_config)
 
 
 def load_dump(d, name, width):
@@ -89,8 +89,8 @@ def main():
     last = load_dump(args.dump, f"l_out-{cfg.num_hidden_layers - 1}", E)
     if rn is not None and last is not None:
         norm = M.Qwen3_5RMSNorm(E, eps=cfg.rms_norm_eps).to(dtype)
-        norm.weight.data = b.tensor("output_norm.weight").to(dtype)
-        report("result_norm", norm(last.to(dtype)), rn)
+        norm.weight.data = hf_value("output_norm.weight", b.tensor("output_norm.weight")).to(dtype)
+        report("result_norm", norm(last[-rn.shape[0]:].to(dtype)), rn)   # fork emits only output tokens
         logits_ref = load_dump(args.dump, "result_output", cfg.vocab_size)
         if logits_ref is not None:
             head = HadamardLinear(E, cfg.vocab_size, b.signs[E], b.H, dtype=dtype)

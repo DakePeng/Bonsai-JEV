@@ -185,13 +185,19 @@ def hf_name(gguf_name: str) -> str:
     return f"model.layers.{li}.{_LAYER_MAP[rest]}"
 
 
+_ZERO_CENTERED_NORMS = ("attn_norm.weight", "post_attention_norm.weight", "attn_q_norm.weight",
+                        "attn_k_norm.weight", "output_norm.weight")
+
+
 def hf_value(gguf_name: str, w: torch.Tensor) -> torch.Tensor:
     """GGUF storage conventions -> HF conventions."""
     if gguf_name.endswith("ssm_a"):
         return torch.log(-w)                 # GGUF stores -exp(A_log)
     if gguf_name.endswith("ssm_conv1d.weight"):
         return w.unsqueeze(1)                # (conv_dim, k) -> (conv_dim, 1, k)
-    return w
+    if gguf_name.endswith(_ZERO_CENTERED_NORMS):
+        return w - 1                         # HF Qwen3_5RMSNorm applies (1 + w); GGUF has the +1 baked in
+    return w                                 # ssm_norm (RMSNormGated) is a plain weight
 
 
 def perm_for(b: Bonsai, gguf_name: str):
@@ -286,6 +292,8 @@ def _selfcheck(gguf_path: str):
     raw = np.asarray(b.t["blk.0.ffn_gate.weight"].data).reshape(17408, 40, 34)[:, :, 2:]
     assert not np.any(((raw[..., None] >> (np.arange(4) * 2)) & 3) == 3), "code 3 present"
     # 4. storage conventions
+    assert abs(hf_value("output_norm.weight", b.tensor("output_norm.weight")).mean() + 1
+               - b.tensor("output_norm.weight").mean()) < 1e-6
     a = b.tensor("blk.0.ssm_a")
     assert torch.all(a < 0) and hf_value("blk.0.ssm_a", a).isfinite().all()
     assert hf_value("blk.0.ssm_conv1d.weight", b.tensor("blk.0.ssm_conv1d.weight")).shape == (10240, 1, 4)
