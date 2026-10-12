@@ -12,7 +12,7 @@ import sys
 
 import torch
 
-from zeroshot_text import KINDS, RANGES, active_probs, load_split, score
+from zeroshot_text import RANGES, active_probs, load_split, score
 
 KINDS = ["noul", "score", "choice"]
 
