@@ -186,6 +186,25 @@ One engineer, ~5 weeks. Rental hours in brackets.
 25. **Optional M5 cross-check, one day:** convert the final LoRA to MLX format, load with the bundled `runtime/` loader, diff 200 rows against the 4070. Only do this if the Mac mini edge-server target is still wanted. Skip otherwise.
 26. **Orin NX** (only if procured): cross-compile the fork for aarch64 / sm_87 under JetPack, copy the same GGUF files, repeat the 200-row diff against the 4070, measure 640×480 latency. The 6 s target is checked here and nowhere else.
 
+### P5 — Image decision round (after P4, needs the text-trained model as the control)
+
+**Why.** JEV-27B-VL's image decisions are zero-shot: its LoRA and head saw text only. Our zero-shot base already scores 74.5% on VL-RewardBench but with a 50.9% order-agree rate (position bias). Image decision data is the one lever JEV never pulled, and the only realistic way to beat it. Text cannot exceed JEV-27B (same teacher labels); the P5 target is the vision side.
+
+**Data, three sources that stack.**
+1. Public human preference sets over images: RLAIF-V, RLHF-V, VLFeedback, POVID (tens of thousands of pairs, hallucination-centred, matching VL-RewardBench's largest subset). Never train on VL-RewardBench or MMRB2 themselves.
+2. Teacher labels from JEV-27B-VL at its *best effort*: both orders averaged, System 2 thinking enabled when System 1 is uncertain, then read the distribution. The student learns the teacher's ceiling, so a single pass can beat the teacher's single pass. One H100/PRO 6000 session, ~¥100 for ~50k images.
+3. Business images (the original P5), labelled the same way.
+
+**Recipe changes (small).**
+- `bonsai_torch.build_model` gains the frozen Qwen3.8-27B vision tower (BF16, Bonsai leaves it unquantized), run under `no_grad`; `train.py` renders image rows with the same bare-v1 template and `<|vision_start|><|image_pad|><|vision_end|>` placeholders, mixing image and text rows with the same stratified sampler so text KL does not regress. Both presentation orders of each pair are training rows (that is what removes the position bias).
+- Memory: +0.9 GB weights, no optimizer state, image tokens cost the same per-token activation as text → ~81 GB, still fits the PRO 6000. A 640×480 image is ~300 tokens, so a 24k-token micro-batch holds ~48 image rows instead of ~100 text rows. Optional: precompute image embeddings once (3 MB per image) if the set is under ~20k images and disk allows.
+- Cost: 50k image rows × ~500 tokens ≈ 25M tokens per epoch, under half of a text epoch → ~¥100–150 per run on 2× PRO 6000.
+- Eval: VL-RewardBench and MMRB2 with the step-10 harness, reporting **single-order accuracy and order-agree**, not only the averaged overall; text KL on `test_set_30k` must stay within 0.005 of the P3 result.
+
+**Targets.** VL-RewardBench overall ≥ 80 (JEV-27B-VL 78.3; the 1,247-pair CI is ±2.4, so claim a win only with ≥3 points and MMRB2 moving the same way), order-agree ≥ 90%, hallucination ≥ 85, text KL unchanged.
+
+**Gate before starting.** P3 finished with a text-trained model and its numbers recorded, so P5's gains are attributable.
+
 ## 4. Budget
 
 RTX PRO 6000 96GB at ¥6.98/h per card.
