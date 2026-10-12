@@ -99,7 +99,14 @@
 
 **过关标准：** 本地运行时能输出正常文本；数字记下来了。
 
-**2026-10-12 实测，4070 12GB，PQ2_0，分支 commit e8fd209，CUDA 12.0，WSL2：** `llama-bench` pp512 = **1226 tok/s**，tg128 = **49.6 tok/s**。和事前估算（1000–1300 / 约 45）一致。推算单次决策延迟：300 token 纯文本约 0.25 秒，640×480 图加问题约 0.4 秒，不含视觉编码器时间。
+**2026-10-12 实测，4070 12GB，PQ2_0，分支 commit e8fd209，CUDA 12.0，WSL2：** `llama-bench` pp512 = **1226 tok/s**，tg128 = **49.6 tok/s**。和事前估算（1000–1300 / 约 45）一致。推算单次决策延迟：300 token 纯文本约 0.25 秒，640×480 图加问题约 0.4 秒，不含视觉编码器时间。带图运行：640×480 视觉编码 119–125 毫秒，**峰值显存 9.17 GB**（模型 + mmproj + 4k 上下文），合成测试图上答案正确。纯文本补全正常。
+
+**GGUF 元数据（PQ2_0 文件），`bonsai_torch.py` 必须复现的内容：**
+- 架构 `qwen35`：64 层，隐藏维 5120，FFN 17408，每 4 层一个全注意力层（第 3、7、… 层），24 头 × head_dim 256，4 个 KV 头；线性注意力层用 `attn_qkv` [5120→10240]、`attn_gate` [5120→6144]、`ssm_out` [6144→5120]，加 BF16 的 `ssm_alpha`/`ssm_beta` [5120→48] 和 F32 的 conv1d、归一化。402 个 PQ2_0 张量，96 个 BF16，353 个 F32。
+- `prism.hadamard.version=1`，`block_size=1024`，`transform=normalized-sylvester-walsh-hadamard`，`axis=input-last-dimension`，`sign_mode=explicit`，符号向量覆盖输入宽度 5120、6144、17408。`weight_names` 列出 401 个折叠权重。`gdn_v_grouped=true` → `ssm_out` 在符号和 Hadamard 之前有 `perm_rep` 特征排列。
+- **`output.weight` 是 PQ2_0 且已折叠（旋转）。** 决策头从它的 24 行初始化，所以要么 (a) 决策头像分支处理 `output.weight` 那样吃 `H(s⊙h)`，要么 (b) 初始化时把这 24 行旋转回去一次（`row_plain = row_rot · H · diag(s)`），让决策头吃原始 `h`。选 (b)：导出就是一个普通的 24×5120 矩阵，运行时不需要任何变换。
+- `token_embd.weight` 是 PQ2_0，带 `inverse-after-lookup`（版本 1，显式输出头，非共享）。
+- 三值码和缩放因子的来源：**直接解包 PQ2_0 GGUF**（和运行时看到的逐位一致），不另外下载 vllm 格式的仓库。
 
 ### 第 1 周 — P0 可行性
 

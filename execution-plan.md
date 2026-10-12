@@ -99,7 +99,14 @@ One engineer, ~5 weeks. Rental hours in brackets.
 
 **Gate:** both local runtimes produce sane text; numbers recorded.
 
-**Measured 2026-10-12, 4070 12GB, PQ2_0, fork commit e8fd209, CUDA 12.0, WSL2:** `llama-bench` pp512 = **1226 tok/s**, tg128 = **49.6 tok/s**. Matches the pre-run estimate (1000–1300 / ~45). Implied single-decision latency: ~0.25 s for 300 text tokens, ~0.4 s for a 640×480 image + question before vision-encoder time.
+**Measured 2026-10-12, 4070 12GB, PQ2_0, fork commit e8fd209, CUDA 12.0, WSL2:** `llama-bench` pp512 = **1226 tok/s**, tg128 = **49.6 tok/s**. Matches the pre-run estimate (1000–1300 / ~45). Implied single-decision latency: ~0.25 s for 300 text tokens, ~0.4 s for a 640×480 image + question before vision-encoder time. Image run: vision encoder 119–125 ms for 640×480, **peak VRAM 9.17 GB** (model + mmproj + 4k context), answer correct on a synthetic test image. Text completion sane.
+
+**GGUF metadata (PQ2_0 file), what `bonsai_torch.py` must replicate:**
+- Architecture `qwen35`: 64 blocks, hidden 5120, FFN 17408, full attention every 4th block (blk 3, 7, …), 24 heads × head_dim 256, 4 KV heads; linear-attention blocks use `attn_qkv` [5120→10240], `attn_gate` [5120→6144], `ssm_out` [6144→5120], plus BF16 `ssm_alpha`/`ssm_beta` [5120→48] and F32 conv1d/norms. 402 PQ2_0 tensors, 96 BF16, 353 F32.
+- `prism.hadamard.version=1`, `block_size=1024`, `transform=normalized-sylvester-walsh-hadamard`, `axis=input-last-dimension`, `sign_mode=explicit` with sign vectors for input widths 5120, 6144, 17408. 401 folded weights listed in `weight_names`. `gdn_v_grouped=true` → `ssm_out` gets the `perm_rep` feature permutation before signs and Hadamard.
+- **`output.weight` is PQ2_0 and folded (rotated).** The decision head is initialized from its 24 verbalizer rows, so either (a) the head consumes `H(s⊙h)` like the fork does for `output.weight`, or (b) un-rotate the 24 rows once at init (`row_plain = row_rot · H · diag(s)`) so the head consumes raw `h`. Pick (b): the head then exports as a plain 24×5120 matrix with no runtime transform.
+- `token_embd.weight` is PQ2_0 with `inverse-after-lookup` (version-1 explicit head, not tied).
+- Source of truth for ternary codes and scales: **unpack the PQ2_0 GGUF directly** (bit-identical to what the runtime sees) rather than downloading the separate vllm-format repo.
 
 ### Week 1 — P0 feasibility
 
