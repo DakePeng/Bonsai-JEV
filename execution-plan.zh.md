@@ -164,7 +164,8 @@
 ### 第 3 周 — P2 训练，同时在 4070 上做 P4 部署
 
 16. **正式训练** [PRO 6000 ×2，22–27 小时，¥310–380]：0.93 个 epoch，约 4,750 步，两卡数据并行。每 250 步存一次 checkpoint 到持久卷。把每类的损失和学习率记成 CSV；和 JEV-9B README 的曲线画在一起对比。
-17. 训练期间：在 4070 上做 `/v1/decide`（FastAPI 套在分支的 server 或 `llama-cpp-python` 上），挂 LoRA 加决策头，读 24 个字母 logits。图片和场景放前面做前缀缓存，问题放后面。正式 checkpoint 出来之前先用冒烟的。如果分支不支持不合并的 LoRA 或读决策头，就在封装层自己加那个 24 行的矩阵乘法；bonjev 的读取代码可以参考。
+17. **2026-10-12 已完成（零样本模式；训练后的适配器只差一个 `--lora` 参数）。** `decide_server.py`（FastAPI）套在分支的 `llama-server` 上：`POST /v1/decide` 的请求和返回和 JEV 的 `serve_decide.py` 一致，所以 `jev_client.py` 和 `jev9b_eval.py` 不改一行就能评测我们的模型（已验证：demo 客户端和离线工具在 300 行上一致）。从 `/completion` 的 `n_probs=1000` 读该类型 verbalizer 的 logprob（全词表 softmax，语义和 JEV 的 `allowed_token_ids` 相同），加上 `decision.json` 里的决策头偏置和按类型温度。决策头本身在 LoRA 文件里（第 15 步），分支不需要任何自定义读取。`run_decide.sh start [适配器目录]` 以 detached 方式启动两个进程（`-np 2 --cache-ram 16384 --cache-reuse 256`；这个分支的 server 每次启动随机化媒体标记，封装层从 `/props` 读）。`test_decide.py` 通过：文本 50 行最大 |Δp| 1.25e-2、图片 5 对 5.2e-3（分支内核在不同 batch 大小下不是逐位一致；重复请求逐位相同），前缀复用正常。
+    **前缀缓存需要预热。** 模型有循环层，server 只能从保存的边界（checkpoint，默认间隔 8192 token）恢复：冷的"状态+问题"提示词不能为下一个问题部分复用。`POST /v1/warm {state, kinds}` 先处理 `[kind] k\n[state] …`；之后对同一状态的每个 `/v1/decide` 只算问题本身（22–26 个 token，189 个图片+场景 token 已缓存），**4070 上每次追问约 0.2 秒**，冷启动 0.5–0.9 秒。JEV 模板带来的限制：`[kind]` 是第一个 token，所以为 `noul` 预热的状态不是 `choice` 提示词的前缀，要按类型分别预热。做其他 GPU 工作前先 `run_decide.sh stop`（占约 9 GB）。
 18. 如果第一次训练在 `test_set_30k` 上的 KL 高于 0.03，加长训练或调学习率再跑一次。预算够跑三次。
 
 **过关标准：** 训练 KL 收敛；4070 上的 `/v1/decide` 和训练端概率差在 0.01 以内。
