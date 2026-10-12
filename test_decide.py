@@ -59,13 +59,15 @@ def main():
     r0 = df.iloc[0]
     scene = ["Scene description: a photo from a camera.\nImage: ", {"image": r0.path}, "\nThe robot is idle."]
     qs = ["Is there a person in the image?", "Is the image taken outdoors?", "Is it safe for the robot to move forward?"]
+    w = requests.post(f"{URL}/v1/warm", json={"state": scene, "kinds": ["noul"]}, timeout=600).json()
+    print("warm:", w)
     ts = []
     for q in qs:
         t0 = time.time()
         d = decide("noul", scene, q)
         ts.append((time.time() - t0, d.get("n_prompt_tokens"), d.get("n_cached")))
     print("latency (s, prompt tokens evaluated, cached):", [(round(t, 3), n, c) for t, n, c in ts])
-    ok = worst < 5e-3 and wi < 5e-3 and ts[1][0] < ts[0][0] / 2
+    ok = worst < 5e-3 and wi < 5e-3 and all(n < 60 for _, n, _ in ts)   # every question only evaluates its own tokens
     print("PASS" if ok else "FAIL")
     sys.exit(0 if ok else 1)
 

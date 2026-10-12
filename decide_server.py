@@ -79,6 +79,34 @@ def render(kind, state, question, options):
     return prompt, images
 
 
+class WarmRequest(BaseModel):
+    state: str | dict | list
+    kinds: list[str] = ["noul"]
+
+
+@app.post("/v1/warm")
+def warm(req: WarmRequest):
+    """Pre-process a state (scene text + images) so that following /v1/decide calls on the same state only
+    evaluate their question tokens. This model has recurrent layers, so the server can only resume from a
+    saved boundary: the end of a warm-up prompt is exactly such a boundary. JEV's template starts with
+    [kind], so warm once per kind you intend to ask (default: noul)."""
+    t0 = time.time()
+    out = {}
+    for kind in req.kinds:
+        if kind not in RANGES:
+            raise HTTPException(400, f"kind must be one of {list(RANGES)}")
+        prompt, images = render(kind, req.state, "", ["x"])
+        prefix = prompt.split("\n[question]")[0]          # "[kind] k\n[state] <state>"
+        body = {"prompt": {"prompt_string": prefix, "multimodal_data": images} if images else prefix,
+                "n_predict": 1, "n_probs": 0, "cache_prompt": True}
+        r = _http.post(f"{LLAMA_URL}/completion", json=body, timeout=600)
+        if not r.ok:
+            raise HTTPException(502, f"llama-server: {r.status_code} {r.text[:300]}")
+        tm = r.json().get("timings", {})
+        out[kind] = {"n_tokens": tm.get("prompt_n", 0) + tm.get("cache_n", 0), "n_cached": tm.get("cache_n")}
+    return {"warmed": out, "elapsed_seconds": round(time.time() - t0, 4)}
+
+
 @app.get("/health")
 def health():
     r = _http.get(f"{LLAMA_URL}/health", timeout=10)
@@ -116,7 +144,7 @@ def decide(req: DecideRequest):
     ci = max(range(len(probs)), key=lambda i: probs[i])
     out = {"kind": kind, "options": options, "probabilities": probs, "choice_index": ci, "choice": options[ci],
            "elapsed_seconds": round(time.time() - t0, 4), "n_prompt_tokens": j.get("tokens_evaluated"),
-           "n_cached": j.get("tokens_cached"), "model": MODEL_NAME, "protocol": "jev27-bare-v1"}
+           "n_cached": j.get("timings", {}).get("cache_n"), "model": MODEL_NAME, "protocol": "jev27-bare-v1"}
     if req.debug:
         out["debug"] = {"logprobs": [top.get(t) for t in ids], "bias": BIAS[lo:lo + len(ids)], "temperature": T,
                         "missing_from_topn": [t for t in ids if t not in top], "timings": j.get("timings")}
