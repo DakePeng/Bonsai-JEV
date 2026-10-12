@@ -205,6 +205,8 @@ One engineer, ~5 weeks. Rental hours in brackets.
 
 **Gate before starting.** P3 finished with a text-trained model and its numbers recorded, so P5's gains are attributable.
 
+**Joint training is the end state.** P5 itself is a mixed run (text and image rows in one stratified sampler). The text-only run before it exists only the first time, as the control and as the trainer's validation against JEV's published curve. Every later retrain (business images, new data mix) is a single joint run from scratch, one round, no separate text stage.
+
 ## 4. Budget
 
 RTX PRO 6000 96GB at ¥6.98/h per card.
