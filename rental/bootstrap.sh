@@ -9,7 +9,7 @@ DATA=${DATA_DISK:-$HOME/autodl-tmp}; [ -d "$DATA" ] || DATA=$HOME
 [ -e ~/bonsai ] || { mkdir -p $DATA/bonsai && ln -s $DATA/bonsai ~/bonsai; }
 R=~/bonsai; mkdir -p $R/models $R/data
 export PIP_NO_CACHE_DIR=1
-MIRROR=${PIP_MIRROR:-https://pypi.tuna.tsinghua.edu.cn/simple}
+MIRROR=${PIP_MIRROR:-https://repo.huaweicloud.com/repository/pypi/simple}   # fastest from AutoDL west-D (measured 2026-10-13)
 [ -e $R/jev ] || ln -s "$(cd "$(dirname "$0")/.." && pwd)" $R/jev
 
 echo "== disks"; df -h $HOME $DATA | tail -2
@@ -17,10 +17,19 @@ echo "== GPU"; nvidia-smi --query-gpu=name,memory.total,driver_version --format=
 free -g | head -2; df -h $R | tail -1
 
 echo "== main venv"
-[ -d $R/venv ] || python3 -m venv $R/venv
+# Reuse the image's CUDA torch when it has one (AutoDL images ship torch+cu13x matching the driver): the venv
+# inherits system site-packages, so only the small packages are downloaded. Otherwise install torch from the mirror.
+TORCH_PKG="torch"
+if python3 -c "import torch, sys; sys.exit(0 if torch.cuda.is_available() else 1)" 2>/dev/null; then
+  echo "system torch $(python3 -c 'import torch; print(torch.__version__)') has CUDA; venv will inherit it"
+  [ -d $R/venv ] || python3 -m venv --system-site-packages $R/venv
+  TORCH_PKG=""
+else
+  [ -d $R/venv ] || python3 -m venv $R/venv
+fi
 . $R/venv/bin/activate
 pip install -q -i $MIRROR -U pip
-pip install -q -i $MIRROR torch transformers peft safetensors accelerate sentencepiece modelscope pandas pyarrow pillow numpy pyyaml requests fastapi "uvicorn[standard]"
+pip install -q -i $MIRROR $TORCH_PKG transformers peft safetensors accelerate sentencepiece modelscope pandas pyarrow pillow numpy pyyaml requests fastapi "uvicorn[standard]"
 # fast GDN + causal-conv1d kernels (Triton); training is several times slower on the torch fallback
 pip install -q -i $MIRROR flash-linear-attention causal-conv1d 2>&1 | tail -1 || echo "WARN: fla/causal-conv1d install failed; torch fallback will be used"
 python3 - <<'EOF'
