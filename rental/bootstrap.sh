@@ -41,7 +41,7 @@ M=$R/models
 [ -f $R/data/vl-rewardbench/data/test-00000-of-00001.parquet ] || modelscope download --dataset MMInstruction/VL-RewardBench --include "data/*" "README.md" --local_dir $R/data/vl-rewardbench
 # 10b (JEV-9B baseline): only the vision adapter (~100 MB) + the multimodal Qwen3.5-9B base (19 GB); the 18 GB
 # JEV-9B text shards are not needed. Delete $M/qwen3.5-9b and $R/venv-vllm after 10b on a 50 GB data disk.
-if [ "${WITH_10B:-1}" = "1" ]; then
+if [ "${WITH_10B:-0}" = "1" ]; then   # 10b skipped by default (decision 2026-10-13)
   [ -f $M/jev-9b/vl/adapter_vllm/adapter_model.safetensors ] || modelscope download --model autotrust/JEV-9B --include "vl/*" "calibration.json" "judge_config.json" "README.md" --local_dir $M/jev-9b
   [ -f $M/qwen3.5-9b/config.json ] || modelscope download --model Qwen/Qwen3.5-9B --local_dir $M/qwen3.5-9b
   [ -d $R/venv-vllm ] || { python3 -m venv $R/venv-vllm && $R/venv-vllm/bin/pip install -q -i $MIRROR -U pip vllm; }
