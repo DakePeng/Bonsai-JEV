@@ -74,7 +74,7 @@ cd ~/bonsai/jev && setsid nohup torchrun --nproc_per_node 2 train.py --out ckpt/
 tail -f results/run1.log        # 每 10 步一行；每 250 步一次验证 KL 和一个 checkpoint（ckpt/run1/last）
 ```
 看什么：`kl n/s/c` 三类都要降；验证 KL 的目标是 0.03 以内；梯度范数不应该长期 > 10。中途断了：同一命令加 `--resume`。
-**每 2 小时把 `ckpt/run1/last`（1.8 GB）经 Mac 拉到 4070**（`ssh autodl tar | ssh 4070 tar`），租的盘不是永久的。训练中**不要关机/重启**：关机会释放 GPU，这台只有两张空闲卡，再开机可能拿不到。
+**每 2 小时把 `ckpt/run1/last`（1.8 GB）拉到 Mac 的 `rental/stage/ckpt/`**（只留最新一份；Mac 不要休眠），租的盘不是永久的。训练中**不要关机/重启**：关机会释放 GPU，这台只有两张空闲卡，再开机可能拿不到。
 
 ## T+26:00 — 卡 0：步骤 19、20 校准和评测（约 1.5 小时）
 
