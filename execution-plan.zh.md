@@ -162,7 +162,7 @@
    - **线性注意力的 value 头顺序。** `gdn_v_grouped=true`：分支原生的 v 头顺序是 tiled（`h = k + nk·r`），HF 是 grouped（`h = r + rep·k`）。GGUF 里按 v 头存的张量（`attn_qkv` 的 v 行、`attn_gate`/z、`ssm_alpha`、`ssm_beta`、`ssm_dt`、`ssm_a`、`ssm_conv1d` 的 v 通道）是 tiled 顺序，给 HF 用要重排。`ssm_out` 的列已经是 grouped（分支是对激活做排列），所以 `perm_for()` 保持恒等。
    - **单独使用的 HF 层必须钉死 `_attn_implementation`**（sdpa）。不设的话 mask 构造器返回空，eager 回退路径会做非因果注意力。
    结果：每个投影和分支的差约 1e-3（分支内核是降精度计算），归一化层 1e-7，层输出 3.5e-4（线性注意力）和 5.9e-4（全注意力），lm_head logits 2e-3，argmax 100% 一致。
-8. **全模型对齐** [PRO 6000 ×1，3–4 小时]：跑完整的 PyTorch 模型，用同样 20 个 prompt 和分支比较最终 logits。
+8. **2026-10-13 在租的机器上完成。** 64 层 BF16 全模型前向对分支导出的 `result_norm`（23 token 的 prompt）：最大相对差 4.45e-3，平均差为平均 |参照| 的 1.2%。通过（门槛 ≤ 1e-2；逐层 fp32 是 3.5e-4，64 层 BF16 累积到这个量级符合预期）。
 9. **检查 llama.cpp 里的 LoRA 位置。2026-10-12 已完成。** LoRA 的输入在 **Hadamard 之前**（原始 `cur`），底座的输入在 Hadamard 之后。另外发现：分支按权重张量逐个从 GGUF 的 `prism.hadamard.*` 键注册旋转，部分权重在符号和 Hadamard 之前还有一个特征排列（`perm_rep`，GDN v 分组），符号在变换之前乘。`bonsai_torch.py` 必须读这些键，只在底座路径上复现 P → ⊙s → H 这条流水线。
 10. **在 4070 上测零样本基线。** 不挂 LoRA，直接读字母 logits。用分支跑 `test_set_30k`（原版 Jev 标注的部分）的文本 KL 和 VL-RewardBench。这是训练后模型必须超过的下限。
    **文本部分，2026-10-12 进行中。** 方法按 JEV 的 `bare-v1` 模板钉死（来自 `common/jev_client.py` 和 `judge_config.json`）：`[kind] k\n[state] s\n[question] q\n[options]\n<行>\n[decision]:`，不加特殊 token，选项行为 `false`/`true`、`0`–`5`、`A) …`；verbalizer id 3721、1802、15–20、32–47（已验证在 Qwen3.8 分词器里完全相同）；在该类型的有效 id 上做 softmax，不加偏置，温度 1。工具：`tools/decide-logits`（分支 example，输出指定 id 的下一 token logits，4070 上约 0.18 秒/行）加 `zeroshot_text.py`（按类型和来源算 KL、准确率、ECE；逐行概率存下来，供之后训练后模型和底座对比）。`yuri_v1` 的行是 `[0.5,0.5]` 占位标签，已排除。**全量结果，27,695 行（`test_set_30k` 去掉占位行后的全部），2026-10-12：**
