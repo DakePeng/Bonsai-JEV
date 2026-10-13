@@ -31,7 +31,8 @@ fi
 pip install -q -i $MIRROR -U pip
 pip install -q -i $MIRROR $TORCH_PKG transformers peft safetensors accelerate sentencepiece modelscope pandas pyarrow pillow numpy pyyaml requests fastapi "uvicorn[standard]"
 # fast GDN + causal-conv1d kernels (Triton); training is several times slower on the torch fallback
-pip install -q -i $MIRROR flash-linear-attention causal-conv1d 2>&1 | tail -1 || echo "WARN: fla/causal-conv1d install failed; torch fallback will be used"
+# causal-conv1d only ships an sdist that needs nvcc (hangs for minutes pulling a CUDA toolkit wheel); HF's torch conv fallback is fine.
+pip install -q -i $MIRROR flash-linear-attention 2>&1 | tail -1 || echo "WARN: flash-linear-attention install failed; torch fallback will be used"
 python3 - <<'EOF'
 import torch, transformers, peft
 print("torch", torch.__version__, "cuda", torch.version.cuda, "gpus", torch.cuda.device_count(), [torch.cuda.get_device_name(i) for i in range(torch.cuda.device_count())])
