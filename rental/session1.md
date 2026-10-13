@@ -18,7 +18,8 @@
 
 ## 租之前
 
-- 数据盘扩到 100 GB（Bonsai 8 GB + JEV-9B 18 GB + Qwen3.5-9B 19 GB + 语料 0.5 GB + checkpoint 若干个 0.5 GB）。不要把 54 GB 的 BF16 底座落盘。
+- 镜像：基础镜像 PyTorch 2.12.1 / Python 3.12 / CUDA 12.8 或 13.0（≥ 12.8 即可，脚本会建自己的 venv）。
+- 磁盘：A32 机数据盘 50 GB 不可扩容，系统盘 30 GB。`bootstrap.sh` 把环境和模型都放数据盘（`~/autodl-tmp`，`~/bonsai` 是软链），pip 不留缓存。预算：Bonsai 8 GB + Qwen3.5-9B 19 GB（10b 用，跑完删）+ JEV-9B 的 vl 适配器 0.1 GB + 语料 0.5 GB + 两个 venv 约 14 GB + checkpoint 约 4 GB ≈ 46 GB。**10b 跑完立刻 `rm -rf ~/bonsai/models/qwen3.5-9b ~/bonsai/venv-vllm`**，再开正式训练。不要把 54 GB 的 BF16 底座落盘。
 - 4070 开机，关掉 Windows 睡眠（第 15 步的真实检查和 10b 的离线对照数据都在它上面）。
 - 把仓库推到租的机器：`git clone` 不通就 `scp -r` 整个 `Bonsai-JEV`。
 
@@ -61,6 +62,7 @@ cd ~/bonsai/jev && CUDA_VISIBLE_DEVICES=1 QUANT=fp8 GPU_UTIL=0.9 bash run_10b.sh
 CUDA_VISIBLE_DEVICES=1 QUANT=none GPU_UTIL=0.9 bash run_10b.sh 2>&1 | tee results/10b-bf16.log
 ```
 过关：VL-RewardBench overall 接近公开的 74.3，文本 KL 接近 0.019。对上了，评测代码可信，JEV-27B-VL 的公开数字直接当目标，第 21 步的教师重跑取消。对不上，先查 `jev_client` 的协议差异再说。
+跑完腾空间：`rm -rf ~/bonsai/models/qwen3.5-9b ~/bonsai/venv-vllm`（释放约 27 GB）。
 
 ## T+1:20 — 卡 0：步骤 14 冒烟（约 1 小时）
 

@@ -3,10 +3,16 @@
 # Usage:  bash rental/bootstrap.sh            (run from the repo root on the box; ~30-40 min, mostly downloads)
 # Layout mirrors the 4070 box so every script's defaults work: ~/bonsai/{jev,venv,venv-vllm,models,data}
 set -eu
+# AutoDL: home (~) is the 30 GB system disk, the data disk is ~/autodl-tmp. Everything big goes there;
+# ~/bonsai is a symlink so all scripts' defaults keep working. pip runs without a cache (it would fill the system disk).
+DATA=${DATA_DISK:-$HOME/autodl-tmp}; [ -d "$DATA" ] || DATA=$HOME
+[ -e ~/bonsai ] || { mkdir -p $DATA/bonsai && ln -s $DATA/bonsai ~/bonsai; }
 R=~/bonsai; mkdir -p $R/models $R/data
+export PIP_NO_CACHE_DIR=1
 MIRROR=${PIP_MIRROR:-https://pypi.tuna.tsinghua.edu.cn/simple}
 [ -e $R/jev ] || ln -s "$(cd "$(dirname "$0")/.." && pwd)" $R/jev
 
+echo "== disks"; df -h $HOME $DATA | tail -2
 echo "== GPU"; nvidia-smi --query-gpu=name,memory.total,driver_version --format=csv,noheader; nvcc --version 2>/dev/null | tail -1 || true
 free -g | head -2; df -h $R | tail -1
 
@@ -33,9 +39,10 @@ M=$R/models
 [ -f $M/qwen3.8-27b-cfg/tokenizer.json ] || modelscope download --model Qwen/Qwen3.8-27B --include "config.json" "generation_config.json" "tokenizer*" "vocab.json" "merges.txt" --local_dir $M/qwen3.8-27b-cfg
 [ -f $R/data/jev-distill-corpus-v3/train.jsonl ] || modelscope download --dataset SargeDev/jev-distill-corpus-v3 --local_dir $R/data/jev-distill-corpus-v3
 [ -f $R/data/vl-rewardbench/data/test-00000-of-00001.parquet ] || modelscope download --dataset MMInstruction/VL-RewardBench --include "data/*" "README.md" --local_dir $R/data/vl-rewardbench
-# 10b (JEV-9B baseline) weights, only if asked
+# 10b (JEV-9B baseline): only the vision adapter (~100 MB) + the multimodal Qwen3.5-9B base (19 GB); the 18 GB
+# JEV-9B text shards are not needed. Delete $M/qwen3.5-9b and $R/venv-vllm after 10b on a 50 GB data disk.
 if [ "${WITH_10B:-1}" = "1" ]; then
-  [ -f $M/jev-9b/vl/adapter_vllm/adapter_model.safetensors ] || modelscope download --model autotrust/JEV-9B --local_dir $M/jev-9b
+  [ -f $M/jev-9b/vl/adapter_vllm/adapter_model.safetensors ] || modelscope download --model autotrust/JEV-9B --include "vl/*" "calibration.json" "judge_config.json" "README.md" --local_dir $M/jev-9b
   [ -f $M/qwen3.5-9b/config.json ] || modelscope download --model Qwen/Qwen3.5-9B --local_dir $M/qwen3.5-9b
   [ -d $R/venv-vllm ] || { python3 -m venv $R/venv-vllm && $R/venv-vllm/bin/pip install -q -i $MIRROR -U pip vllm; }
   [ -d $R/JEV-27B-DEMO ] || git clone -q --depth 1 https://github.com/yuhai-china/JEV-27B-DEMO.git $R/JEV-27B-DEMO || echo "WARN: demo repo clone failed (needed for jev_client in 10b)"
