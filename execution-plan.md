@@ -97,6 +97,24 @@ The community leaderboard (149 text entrants, 33 vision entrants, one RTX PRO 60
 
 Rule: training data for the shipped model must be Apache/MIT/CC0/own; NC and research-only sets are for evaluation and ablations only.
 
+### 1.5 Open-source release
+
+**License: Apache 2.0** for everything we produce (LoRA, decision head, `decision.json`, calibration, code, GGUF bundles). The whole stack is Apache 2.0 (Bonsai, Qwen3.8, JEV adapters, corpus), Apache carries a patent grant, and one license across the bundle avoids per-file notices. MIT would also be allowed for our own files but would need dual notices in the packaged GGUF.
+
+**What gets released**
+- `adapter.gguf` (LoRA + head as lm_head LoRA, step 15) + `decision.json` + `calibration.json` for the fork; the peft adapter + `head.safetensors` for PyTorch; the serving wrapper (`decide_server.py`, `run_decide.sh`); the eval scripts and the zero-shot/trained numbers.
+- No base weights re-hosted unless packaging a merged GGUF; then Prism ML's NOTICE travels with it.
+- `LICENSE` (Apache 2.0) and `NOTICE`: "Created using Bonsai by Prism ML"; built on Qwen3.8-27B (Alibaba Cloud, Apache 2.0); JEV (autotrust, Apache 2.0) used as baseline/teacher; "trained on SargeDev/jev-distill-corpus-v3" with the link the author asks for.
+
+**Which checkpoint may be released**
+| Training data | Releasable? |
+|---|---|
+| Clean set: `openjev_v2` (CC0) + `yuri_v1` + own synthetic data labelled by JEV-27B/JEV-27B-VL (Apache 2.0) + business images we own | **Yes, unconditionally.** This is the release build. |
+| Full `jev-distill-corpus-v3` incl. `yuri_v3` (labels from TypeSafe's Jev 1.13) | Only after TypeSafe's API terms are confirmed not to forbid distillation. Open release is more visible than internal use; confirm first. |
+| Anything touching RLAIF-V / RLHF-V (CC BY-NC) or VLFeedback (no license) | **No.** Keep those runs as internal ablations. |
+
+**Plan impact.** The first training run (P2) uses the full corpus as the JEV-recipe control. Add one more run on the clean set (same recipe, ~¥350); if its KL is within 0.005 of the full-corpus run, the clean set becomes the default and the TypeSafe question stops mattering for the release. Model card must state: LoRA-on-frozen-ternary, so the quality ceiling is JEV level; order-agree and single-order accuracy alongside the averaged VL-RewardBench score; the DI board score and the ≥96% BF16 agreement figure.
+
 ## 2. Risks the original plan missed
 
 | Risk | Why it matters | Check |

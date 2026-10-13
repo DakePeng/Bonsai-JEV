@@ -97,6 +97,24 @@
 
 规则：发布模型的训练数据必须是 Apache/MIT/CC0/自有；NC 和仅研究用途的数据集只用于评测和消融。
 
+### 1.5 开源方案
+
+**许可证：Apache 2.0**，覆盖我们产出的全部（LoRA、决策头、`decision.json`、校准文件、代码、GGUF 打包）。整条链都是 Apache 2.0（Bonsai、Qwen3.8、JEV 适配器、语料），Apache 带专利授权，打包里一个许可证省去逐文件标注。MIT 用在我们自己的文件上也可以，但打包 GGUF 时要双重声明。
+
+**发布内容**
+- 给分支用的 `adapter.gguf`（LoRA + 作为 lm_head LoRA 的决策头，第 15 步）+ `decision.json` + `calibration.json`；给 PyTorch 用的 peft 适配器 + `head.safetensors`；服务封装（`decide_server.py`、`run_decide.sh`）；评测脚本和零样本/训练后的数字。
+- 不重新托管底座权重，除非发布合并后的 GGUF；那时 Prism ML 的 NOTICE 随包附带。
+- `LICENSE`（Apache 2.0）和 `NOTICE`："Created using Bonsai by Prism ML"；基于 Qwen3.8-27B（阿里云，Apache 2.0）；JEV（autotrust，Apache 2.0）用作基线/教师；"trained on SargeDev/jev-distill-corpus-v3"并附作者要求的链接。
+
+**哪个 checkpoint 可以发布**
+| 训练数据 | 可发布？ |
+|---|---|
+| 干净集：`openjev_v2`（CC0）+ `yuri_v1` + 用 JEV-27B/JEV-27B-VL（Apache 2.0）打标签的自有合成数据 + 自有业务图片 | **可以，无条件。** 这是发布版。 |
+| 完整的 `jev-distill-corpus-v3` 含 `yuri_v3`（标签来自 TypeSafe 的 Jev 1.13） | 要先确认 TypeSafe 的 API 条款不禁止蒸馏。开源比内部使用更显眼，先问清楚。 |
+| 碰过 RLAIF-V / RLHF-V（CC BY-NC）或 VLFeedback（无许可证）的 | **不行。** 这些只作内部消融。 |
+
+**对计划的影响。** 第一次训练（P2）仍用完整语料，作为 JEV 配方的对照。再加一次干净集的训练（同配方，约 ¥350）；如果它的 KL 和完整语料那次相差在 0.005 以内，干净集就成为默认，TypeSafe 的问题对发布版不再构成影响。模型卡必须写明：冻结三值底座上的 LoRA，质量天花板是 JEV 水平；平均后的 VL-RewardBench 分数旁边并列顺序一致率和单顺序准确率；DI 榜分和 ≥ 96% 的 BF16 一致率数字。
+
 ## 2. 原方案漏掉的风险
 
 | 风险 | 为什么重要 | 怎么查 |
