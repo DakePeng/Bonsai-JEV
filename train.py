@@ -189,8 +189,12 @@ def main():
     model, head = build(args, b, cfg, device, dtype)
     if world > 1:
         from torch.nn.parallel import DistributedDataParallel as DDP
-        model = DDP(model, device_ids=[rank])
-        head = DDP(head, device_ids=[rank])
+        # Every rank builds the identical frozen base from the same GGUF: don't broadcast its 54 GB (or the Hadamard
+        # buffers) at init or every forward. Only LoRA params are synced (same seed -> same init, broadcast anyway).
+        model._ddp_params_and_buffers_to_ignore = (
+            [n for n, p in model.named_parameters() if not p.requires_grad] + [n for n, _ in model.named_buffers()])
+        model = DDP(model, device_ids=[rank], broadcast_buffers=False)
+        head = DDP(head, device_ids=[rank], broadcast_buffers=False)
     n_lora = sum(p.numel() for p in model.parameters() if p.requires_grad)
     log(f"trainable: lora {n_lora/1e6:.1f}M, head {sum(p.numel() for p in head.parameters())/1e3:.1f}k")
 

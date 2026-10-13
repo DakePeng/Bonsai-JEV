@@ -300,7 +300,8 @@ def build_model(b: Bonsai, cfg, dtype=torch.bfloat16, device="cuda", n_layers=No
     model.embed_tokens = HadamardEmbedding(cfg.vocab_size, cfg.hidden_size, b.signs[cfg.hidden_size], b.H, dtype)
     keep = [n for n in b.t if n != "output.weight" and (not n.startswith("blk.") or int(n.split(".")[1]) < cfg.num_hidden_layers)]
     loaded, missing = load_into(model, b, keep, "model.", dtype, device)
-    model.rotary_emb = type(model.rotary_emb)(cfg, device=device)   # non-persistent buffers were created on meta
+    # non-persistent buffers were created on meta; the constructor computes inv_freq on CPU, so move it explicitly
+    model.rotary_emb = type(model.rotary_emb)(cfg, device=device).to(device)
     assert all("rotary_emb" in m or "inv_freq" in m for m in missing), missing
     return model
 
