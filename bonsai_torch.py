@@ -21,7 +21,10 @@ import torch.nn.functional as F
 
 GGUF_PY = os.environ.get("GGUF_PY", os.path.expanduser("~/bonsai/llama.cpp/gguf-py"))
 sys.path.insert(0, GGUF_PY)
-from gguf import GGUFReader  # noqa: E402
+try:
+    from gguf import GGUFReader  # fork's gguf-py (preferred) or the pip package
+except ImportError:  # pragma: no cover
+    raise ImportError("gguf not found: set GGUF_PY to the fork's gguf-py dir or `pip install gguf`")
 
 # ----------------------------------------------------------------------------- PQ2_0
 QK = 128            # weights per block
