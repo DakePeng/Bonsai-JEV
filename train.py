@@ -235,18 +235,28 @@ def main():
         return {k: sums[k] / max(1, cnt[k]) for k in KINDS}, sum(sums.values()) / max(1, sum(cnt.values()))
 
     def save(tag):
+        """Write to <tag>.tmp, then swap in atomically; the previous <tag> is kept as <tag>.prev. A crash or
+        power cut mid-write can never leave the only checkpoint half-written."""
         if not is_main:
             return
+        import shutil
         d = os.path.join(args.out, tag)
-        os.makedirs(d, exist_ok=True)
+        tmp = d + ".tmp"
+        shutil.rmtree(tmp, ignore_errors=True)
+        os.makedirs(tmp)
         m, hd = (model.module if world > 1 else model), (head.module if world > 1 else head)
         lora_sd = {k: v for k, v in m.state_dict().items() if "lora_" in k}
         torch.save({"lora": lora_sd, "head": hd.state_dict(), "opt": opt.state_dict(), "sched": sched.state_dict(),
-                    "step": step, "rng": sampler.rng.getstate(), "args": vars(args)}, os.path.join(d, "state.pt"))
-        m.save_pretrained(d)                                   # peft adapter (adapter_model.safetensors + config)
+                    "step": step, "rng": sampler.rng.getstate(), "args": vars(args)}, os.path.join(tmp, "state.pt"))
+        m.save_pretrained(tmp)                                 # peft adapter (adapter_model.safetensors + config)
         from safetensors.torch import save_file
-        save_file({k: v.detach().cpu().contiguous() for k, v in hd.state_dict().items()}, os.path.join(d, "head.safetensors"))
-        json.dump({"verbalizer_ids": VERBALIZER_IDS, "ranges": RANGES, "step": step}, open(os.path.join(d, "head.json"), "w"))
+        save_file({k: v.detach().cpu().contiguous() for k, v in hd.state_dict().items()}, os.path.join(tmp, "head.safetensors"))
+        json.dump({"verbalizer_ids": VERBALIZER_IDS, "ranges": RANGES, "step": step}, open(os.path.join(tmp, "head.json"), "w"))
+        prev = d + ".prev"
+        shutil.rmtree(prev, ignore_errors=True)
+        if os.path.exists(d):
+            os.replace(d, prev)
+        os.replace(tmp, d)
 
     logf = open(os.path.join(args.out, "log.csv"), "a", newline="")
     logw = csv.writer(logf)
