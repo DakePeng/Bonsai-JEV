@@ -60,11 +60,12 @@ if [ "${WITH_10B:-0}" = "1" ]; then   # 10b skipped by default (decision 2026-10
   [ -d $R/venv-vllm ] || { python3 -m venv $R/venv-vllm && $R/venv-vllm/bin/pip install -q -i $MIRROR -U pip vllm; }
   [ -d $R/JEV-27B-DEMO ] || git clone -q --depth 1 https://github.com/yuhai-china/JEV-27B-DEMO.git $R/JEV-27B-DEMO || echo "WARN: demo repo clone failed (needed for jev_client in 10b)"
 fi
-# gguf-py for bonsai_torch (reads the GGUF); only the python package is needed, not the fork build
-[ -d $R/llama.cpp/gguf-py ] || { mkdir -p $R/llama.cpp && pip download -q -i $MIRROR --no-deps -d /tmp/ggufpy gguf 2>/dev/null; pip install -q -i $MIRROR gguf; python3 -c "import gguf, os; print('gguf-py', gguf.__file__)"; }
-export GGUF_PY=$(python3 -c "import gguf, os; print(os.path.dirname(os.path.dirname(gguf.__file__)))")
+# gguf-py: must be the PrismML fork's copy (the pip package does not know the PQ2_0/PTQ1_0 types). Ship it
+# from the 4070 box (~/bonsai/llama.cpp/gguf-py) into $R/llama.cpp/gguf-py before running this script.
+[ -f $R/llama.cpp/gguf-py/gguf/gguf_reader.py ] || { echo "ERROR: fork gguf-py missing at $R/llama.cpp/gguf-py (copy it from the 4070 box)"; exit 1; }
+export GGUF_PY=$R/llama.cpp/gguf-py
 
 echo "== self-check"
 cd $R/jev && GGUF_PY=$GGUF_PY python3 bonsai_torch.py
-echo "bootstrap done. export GGUF_PY=$GGUF_PY in every shell (or add to ~/.bashrc)"
-echo "export GGUF_PY=$GGUF_PY" >> ~/.bashrc
+grep -q "GGUF_PY=" ~/.bashrc || echo "export GGUF_PY=$GGUF_PY" >> ~/.bashrc
+echo "bootstrap done. GGUF_PY=$GGUF_PY"

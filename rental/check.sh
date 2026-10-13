@@ -2,6 +2,7 @@
 # Steps 11 + 8 on the rental box (one GPU, ~40 min). Run: bash rental/check.sh 2>&1 | tee results/check.log
 set -u
 cd ~/bonsai/jev && . ~/bonsai/venv/bin/activate && mkdir -p results
+export GGUF_PY=~/bonsai/llama.cpp/gguf-py   # the fork's gguf-py (knows PQ2_0); pip's does not
 export CUDA_VISIBLE_DEVICES=${GPU:-0}
 echo "== step 11: full 27B, LoRA, checkpointing, 24k-token micro-batches, 3 steps"
 ( while true; do nvidia-smi --query-gpu=memory.used --format=csv,noheader,nounits -i ${GPU:-0}; sleep 5; done ) > results/check_vram.txt 2>/dev/null & SP=$!

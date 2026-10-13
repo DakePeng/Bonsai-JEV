@@ -3,6 +3,7 @@
 # eval on validation, export to GGUF. Run: bash rental/smoke.sh 2>&1 | tee results/smoke_all.log
 set -u
 cd ~/bonsai/jev && . ~/bonsai/venv/bin/activate && mkdir -p results
+export GGUF_PY=~/bonsai/llama.cpp/gguf-py   # the fork's gguf-py (knows PQ2_0); pip's does not
 export CUDA_VISIBLE_DEVICES=${GPU:-0}
 echo "== 14a: head only (LoRA lr 0), 20 steps"
 python3 train.py --out ckpt/smoke-head --steps 20 --train-limit 5000 --eval-rows 512 --eval-every 20 --save-every 20 --lr-lora 0 2>&1 | grep -E "^\[.*(step|eval|trainable|done)" | tail -8
