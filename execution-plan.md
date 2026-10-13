@@ -250,6 +250,27 @@ One engineer, ~5 weeks. Rental hours in brackets.
 
 **Gate before starting.** P3 finished with a text-trained model and its numbers recorded, so P5's gains are attributable.
 
+**Can P5 beat JEV-27B? Assessment (2026-10-14).**
+- *Text: no.* Same teacher labels (Jev 1.13); JEV-27B's LoRA sits on a BF16 base, ours on a ternary one. Distillation can only approach the teacher. Text target stays "close to 0.017", and image rows must not push it up.
+- *Vision: a real lever, two headwinds.* Lever: JEV-27B-VL's image decisions are zero-shot, it never saw image decision data. Headwind 1: ternarisation hurts vision reasoning more than text (Bonsai's own card: MMMU-Pro 81.7 → 75.5, OCR Bench v2 61.0 → 56.9); our 74.5 zero-shot leans on two-order averaging. Headwind 2: commercially usable image preference data is scarce (RLAIF-V/RLHF-V are NC), so the release build must learn from JEV-27B-VL's own labels, and its 78.3 already uses two-order averaging, leaving little room above the teacher. Reference point: the DI vision leader (d3 27B, full fine-tune, image-capable) beats JEV-27B-VL by only 1.7 (71.3 vs 69.6).
+
+| Target | Chance to beat JEV-27B(-VL) |
+|---|---|
+| Text KL | < 5% |
+| VL-RewardBench by ≥ 3 points, research build (NC data allowed) | 40–50% |
+| Same, release build (JEV labels + own data only) | ~25% |
+| DI vision board (broad, private sets) | 15–20% |
+
+**Primary P5 goal is therefore order consistency, not the headline score:** order-agree from 51% to ≥ 90% and single-order accuracy close to the averaged accuracy, so one forward pass is trustworthy (robot use asks once). "Within 1–2 points of JEV-27B-VL at ~8 GB" is the product claim; beating it is a bonus.
+
+**Decision rule after run 1 (text-only), measured on the 4070 with the step-10 harness:**
+| run-1 VL-RewardBench (two-order avg) | Reading | P5 action |
+|---|---|---|
+| ≥ 77 | Text training already near JEV-27B-VL; ternary penalty small | Run P5 aiming to exceed 78.3 (≥ 81 to claim a win, given ±2.4 CI), plus order-agree ≥ 90% |
+| 75–77 | Partial recovery | Run P5 aiming to match 78.3 and fix order consistency; report as parity, not a win |
+| ≤ 75 | Ternary penalty dominates | Run P5 only for order consistency; drop the "beat JEV" goal; consider whether the edge pitch still holds against a 4-bit 9B (66.9 on the DI vision board) |
+In every row also record single-order accuracy, order-agree, and hallucination subset; and check text KL did not move by more than 0.005.
+
 **Joint training is the end state.** P5 itself is a mixed run (text and image rows in one stratified sampler). The text-only run before it exists only the first time, as the control and as the trainer's validation against JEV's published curve. Every later retrain (business images, new data mix) is a single joint run from scratch, one round, no separate text stage.
 
 ## 4. Budget
