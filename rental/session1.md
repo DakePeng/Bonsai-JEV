@@ -9,7 +9,7 @@
 | T+0:00 | — | 步骤 5 环境 + 下载 | 0.7 h |
 | T+0:40 | 卡 0 | 步骤 11 训练内核检查 + 步骤 8 整模型检查 | 0.7 h |
 | T+1:20 | 卡 0 | 步骤 14 冒烟（决策头 sanity + 1% 数据）、导出 | 1 h |
-| T+2:30 | 两卡 | 步骤 16 正式训练，3,700 步 | 22–27 h |
+| T+2:30 | 两卡 | 步骤 16 正式训练，4,000 步 | 22–27 h |
 | T+26 | 卡 0 | 步骤 19、20 校准和评测，导出 | 1.5 h |
 | T+27 | — | 打包、拷出、释放 | 0.3 h |
 
@@ -70,7 +70,7 @@ scp -r ckpt/smoke/final <4070>:~/bonsai/ckpt-smoke
 ## T+2:30 — 两张卡：步骤 16 正式训练（22–27 小时）
 
 ```bash
-cd ~/bonsai/jev && setsid nohup torchrun --nproc_per_node 2 train.py --out ckpt/run1 --steps 3700 > results/run1.log 2>&1 < /dev/null &
+cd ~/bonsai/jev && setsid nohup torchrun --nproc_per_node 2 train.py --out ckpt/run1 --steps 4000 > results/run1.log 2>&1 < /dev/null &
 tail -f results/run1.log        # 每 10 步一行；每 250 步一次验证 KL 和一个 checkpoint（ckpt/run1/last）
 ```
 看什么：`kl n/s/c` 三类都要降；验证 KL 的目标是 0.03 以内；梯度范数不应该长期 > 10。中途断了：同一命令加 `--resume`。
