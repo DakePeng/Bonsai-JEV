@@ -44,7 +44,10 @@ EOF
 
 echo "== models & data (ModelScope)"
 M=$R/models
-[ -f $M/bonsai2-27b/Ternary-Bonsai-2-27B-PQ2_0.gguf ] || modelscope download --model prism-ml/Ternary-Bonsai-2-27B-gguf --include "Ternary-Bonsai-2-27B-PQ2_0.gguf" "Ternary-Bonsai-2-27B-mmproj-Q8_0.gguf" "README.md" "KNOWN_ISSUES.md" --local_dir $M/bonsai2-27b
+# big files via 16 parallel range requests (ModelScope gives ~1.6 MB/s per stream from AutoDL, ~18 MB/s with 16)
+bash $R/jev/rental/msdl.sh prism-ml/Ternary-Bonsai-2-27B-gguf Ternary-Bonsai-2-27B-PQ2_0.gguf $M/bonsai2-27b/Ternary-Bonsai-2-27B-PQ2_0.gguf 16
+bash $R/jev/rental/msdl.sh prism-ml/Ternary-Bonsai-2-27B-gguf Ternary-Bonsai-2-27B-mmproj-Q8_0.gguf $M/bonsai2-27b/Ternary-Bonsai-2-27B-mmproj-Q8_0.gguf 8
+[ -f $M/bonsai2-27b/KNOWN_ISSUES.md ] || modelscope download --model prism-ml/Ternary-Bonsai-2-27B-gguf --include "README.md" "KNOWN_ISSUES.md" --local_dir $M/bonsai2-27b
 [ -f $M/qwen3.8-27b-cfg/tokenizer.json ] || modelscope download --model Qwen/Qwen3.8-27B --include "config.json" "generation_config.json" "tokenizer*" "vocab.json" "merges.txt" --local_dir $M/qwen3.8-27b-cfg
 [ -f $R/data/jev-distill-corpus-v3/train.jsonl ] || modelscope download --dataset SargeDev/jev-distill-corpus-v3 --local_dir $R/data/jev-distill-corpus-v3
 [ -f $R/data/vl-rewardbench/data/test-00000-of-00001.parquet ] || modelscope download --dataset MMInstruction/VL-RewardBench --include "data/*" "README.md" --local_dir $R/data/vl-rewardbench
