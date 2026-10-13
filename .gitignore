@@ -3,3 +3,4 @@ models/
 *.safetensors
 __pycache__/
 *.log
+rental/stage/
