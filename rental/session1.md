@@ -74,7 +74,7 @@ cd ~/bonsai/jev && setsid nohup torchrun --nproc_per_node 2 train.py --out ckpt/
 tail -f results/run1.log        # 每 10 步一行；每 250 步一次验证 KL 和一个 checkpoint（ckpt/run1/last）
 ```
 看什么：`kl n/s/c` 三类都要降；验证 KL 的目标是 0.03 以内；梯度范数不应该长期 > 10。中途断了：同一命令加 `--resume`。
-**每隔几小时把 `ckpt/run1/last` 拷出去一份**（scp 到 4070 或下载到本地），租的盘不是永久的。
+**每 2 小时把 `ckpt/run1/last`（1.8 GB）经 Mac 拉到 4070**（`ssh autodl tar | ssh 4070 tar`），租的盘不是永久的。训练中**不要关机/重启**：关机会释放 GPU，这台只有两张空闲卡，再开机可能拿不到。
 
 ## T+26:00 — 卡 0：步骤 19、20 校准和评测（约 1.5 小时）
 
@@ -95,7 +95,9 @@ python3 export_gguf_lora.py --ckpt ckpt/run1/final --out ckpt/run1/final/adapter
 tar czf run1-release.tgz ckpt/run1/final results/run1_* results/smoke* results/kernel-check.log
 scp run1-release.tgz <4070>:~/bonsai/   # 或下载到本机
 ```
-然后释放实例。看图评测（第 21 步）和服务对比（第 15、17 步）都在 4070 上做，不占租卡时间。
+**释放前先重启一次**挂上文件存储（`/root/autodl-fs`，西北B区已初始化，前 20 GB 免费，实例释放后保留），把 Bonsai 权重 + 语料 + 适配器 + 结果拷进去（约 12 GB），下次租卡一开机就全在，免下载。此时有没有卡已无所谓。然后释放实例。看图评测（第 21 步）和服务对比（第 15、17 步）都在 4070 上做，不占租卡时间。
+
+环境注意（2026-10-13 实测）：pip 用华为源（阿里 0.17 MB/s、清华 0.28、华为 1.1）；venv 继承镜像自带的 torch 2.12.1+cu130，不另装 torch；`causal-conv1d` 要 nvcc 从源码编，跳过，只装 `flash-linear-attention`；ModelScope 下载约 3 MB/s，8.6 GB 权重约 45 分钟，下次从文件存储拷。
 
 ## 时间和费用
 
