@@ -148,7 +148,9 @@ def main():
     ap.add_argument("--layers", type=int, default=None, help="truncate the stack (smoke tests)")
     ap.add_argument("--device", default="cuda")
     ap.add_argument("--dtype", default="bfloat16")
-    ap.add_argument("--steps", type=int, default=3700, help="~0.93 epoch of ~507k rows at 128/step")
+    ap.add_argument("--steps", type=int, default=4000,
+                    help="JEV-27B parity: it saw 640k rows (5,000 x 128) of which 79%% non-placeholder = 506k; /128 = ~4,000")
+    ap.add_argument("--lr-floor", type=float, default=0.02, help="cosine anneals to this fraction of peak (JEV-27B: 0.02)")
     ap.add_argument("--rows-per-step", type=int, default=128)
     ap.add_argument("--max-tokens", type=int, default=24000, help="padded tokens per micro-batch")
     ap.add_argument("--lr-head", type=float, default=2e-4)
@@ -206,10 +208,12 @@ def main():
         {"params": list(head.parameters()), "lr": args.lr_head},
     ], betas=(0.9, 0.98), weight_decay=0.0, fused=device.startswith("cuda"))
     warm = int(args.warmup * args.steps)
+    fl = args.lr_floor
     sched = torch.optim.lr_scheduler.LambdaLR(opt, lambda s: (s + 1) / max(1, warm) if s < warm
-                                              else 0.5 * (1 + math.cos(math.pi * (s - warm) / max(1, args.steps - warm))))
+                                              else fl + (1 - fl) * 0.5 * (1 + math.cos(math.pi * min(1.0, (s - warm) / max(1, args.steps - warm)))))
 
     step = 0
+    best_kl = float("inf")          # validation KL of the "best" checkpoint (JEV-27B picked its release by val KL)
     ck = os.path.join(args.out, "last")
     if args.resume and os.path.exists(os.path.join(ck, "state.pt")):
         st = torch.load(os.path.join(ck, "state.pt"), map_location=device)
@@ -219,7 +223,8 @@ def main():
         sched.load_state_dict(st["sched"])
         step = st["step"]
         sampler.rng.setstate(st["rng"])
-        log(f"resumed at step {step}")
+        best_kl = st.get("best_kl", float("inf"))
+        log(f"resumed at step {step}, best val KL so far {best_kl:.4f}")
 
     def evaluate():
         model.eval()
@@ -247,7 +252,8 @@ def main():
         m, hd = (model.module if world > 1 else model), (head.module if world > 1 else head)
         lora_sd = {k: v for k, v in m.state_dict().items() if "lora_" in k}
         torch.save({"lora": lora_sd, "head": hd.state_dict(), "opt": opt.state_dict(), "sched": sched.state_dict(),
-                    "step": step, "rng": sampler.rng.getstate(), "args": vars(args)}, os.path.join(tmp, "state.pt"))
+                    "step": step, "rng": sampler.rng.getstate(), "best_kl": best_kl, "args": vars(args)},
+                   os.path.join(tmp, "state.pt"))
         m.save_pretrained(tmp)                                 # peft adapter (adapter_model.safetensors + config)
         from safetensors.torch import save_file
         save_file({k: v.detach().cpu().contiguous() for k, v in hd.state_dict().items()}, os.path.join(tmp, "head.safetensors"))
@@ -297,6 +303,10 @@ def main():
             log(f"eval step {step}: KL all {allkl:.4f} " + " ".join(f"{k} {v:.4f}" for k, v in per.items()))
             if is_main:
                 json.dump({"step": step, "kl": allkl, **per}, open(os.path.join(args.out, f"eval_{step}.json"), "w"))
+                if allkl < best_kl:
+                    best_kl = allkl
+                    save("best")
+                    log(f"new best val KL {best_kl:.4f} at step {step} -> {args.out}/best")
         if step % args.save_every == 0 or step == args.steps:
             save("last")
             if step == args.steps:
