@@ -81,6 +81,22 @@
 
 **从榜上借的四条，已写进下面的步骤：** 倒序二次读取（Decider 31B）、随选项数变化的温度（Decider）、公开基准 train 划分作为补充数据（Darwin/Decider/Torchcast，做泄漏过滤）、跑 DI 公开套件用于提交。轮换平均加无标签先验（AnyJev L0，不训练拿到 60.2）是训练后顺序一致率不达标时的兜底。
 
+### 1.4 许可证（2026-10-13 核对）
+
+| 组件 | 许可证 | 对本项目的影响 |
+|---|---|---|
+| Ternary Bonsai 2 27B（权重、mmproj） | Apache 2.0（Prism ML 的 NOTICE；基于 Qwen3.8-27B，Apache 2.0） | 微调、LoRA、再分发、商用都允许。要求署名："Created using Bonsai by Prism ML"。 |
+| PrismML 的 llama.cpp 分支 | MIT | 可以随产品发布；保留版权声明。 |
+| Qwen3.8-27B 的配置/分词器/视觉塔 | Apache 2.0 | 没问题。 |
+| `SargeDev/jev-distill-corpus-v3` | 数据集层面 Apache 2.0；`openjev_v2` 源头 CC0 | 允许训练；要署名数据集。**待确认点：** `yuri_v3`（49.8 万行，占语料三分之二）的标签是用 TypeSafe 的 Jev 1.13 通过 OpenRouter 生成的。数据集卡片没提 TypeSafe 的 API 条款，TypeSafe 网站条款不覆盖 API，OpenRouter 条款要求用户自行遵守各提供方的模型条款。没找到任何禁止用 Jev 输出训练的公开条款，也没找到允许的。商用发布前要读 TypeSafe 的 API 协议；如果禁止蒸馏，退到 `openjev_v2`（CC0）+ `yuri_v1` + 用 JEV-27B（Apache 2.0，见下一行）打标签的自有合成数据。 |
+| JEV-9B / JEV-27B / JEV-27B-VL（适配器、决策头）、JEV-27B-DEMO | Apache 2.0 | 当基线、评测代码和 **P5 的教师**都允许。万一 Jev-1.13 标注的那部分要弃用，它也是干净的教师。 |
+| VL-RewardBench | YAML 写 MIT，卡片写"仅限研究用途"，源自 GPT-4o/Claude 的输出 | 只用于评测，绝不训练。只报数字，不再分发。 |
+| RLAIF-V、RLHF-V（P5 候选） | CC BY-NC 4.0 | **商用模型不能用。** 只做研究性消融，或换成用 JEV-27B 打标签的公开图片和业务图片。 |
+| VLFeedback | 未声明许可证 | 澄清前视为不可用。 |
+| Open-Jev（`ZefanCai/Open-Jev`） | CC0 | 随意用。 |
+
+规则：发布模型的训练数据必须是 Apache/MIT/CC0/自有；NC 和仅研究用途的数据集只用于评测和消融。
+
 ## 2. 原方案漏掉的风险
 
 | 风险 | 为什么重要 | 怎么查 |

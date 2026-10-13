@@ -81,6 +81,22 @@ The community leaderboard (149 text entrants, 33 vision entrants, one RTX PRO 60
 
 **Four things borrowed from the board, now in the steps below:** conditional second reading with reversed options (Decider 31B), option-count-dependent temperature (Decider), public benchmark train splits as extra data (Darwin/Decider/Torchcast, leakage-filtered), and a DI public-suite run for submission. Rotation averaging + label-free prior (AnyJev L0, 60.2 with no training) is the fallback if training underdelivers on order consistency.
 
+### 1.4 Licensing (checked 2026-10-13)
+
+| Component | License | Effect on this project |
+|---|---|---|
+| Ternary Bonsai 2 27B (weights, mmproj) | Apache 2.0 (Prism ML NOTICE; built on Qwen3.8-27B, Apache 2.0) | Fine-tune, LoRA, redistribute, commercial use all allowed. Attribution requested: "Created using Bonsai by Prism ML". |
+| PrismML llama.cpp fork | MIT | Ship it; keep the copyright notice. |
+| Qwen3.8-27B config/tokenizer/vision tower | Apache 2.0 | Fine. |
+| `SargeDev/jev-distill-corpus-v3` | Apache 2.0 (dataset level); `openjev_v2` CC0 at source | Training allowed; credit the dataset. **Open point:** `yuri_v3` labels (498k rows, 2/3 of the corpus) were produced by TypeSafe's Jev 1.13 via OpenRouter. The dataset card does not address TypeSafe's API terms, TypeSafe's website terms don't cover the API, and OpenRouter's terms make the user responsible for each provider's Model Terms. No published clause forbidding training on Jev outputs was found, but none permitting it either. Before a commercial release, read TypeSafe's API agreement; if it forbids distillation, fall back to `openjev_v2` (CC0) + `yuri_v1` + own synthetic data labelled by JEV-27B (Apache 2.0, see next row). |
+| JEV-9B / JEV-27B / JEV-27B-VL (adapters, head), JEV-27B-DEMO | Apache 2.0 | Using them as baseline, harness and **P5 teacher** is allowed. This also gives a clean teacher if the Jev-1.13-labelled stream has to be dropped. |
+| VL-RewardBench | YAML says MIT, card says "research use only", derived from GPT-4o/Claude outputs | Evaluation only, never training. Report numbers, don't redistribute. |
+| RLAIF-V, RLHF-V (P5 candidates) | CC BY-NC 4.0 | **Not usable for a commercial model.** Use them only for research ablations, or replace with JEV-27B-labelled public images and business images. |
+| VLFeedback | no license declared | Treat as unusable until clarified. |
+| Open-Jev (`ZefanCai/Open-Jev`) | CC0 | Free to use. |
+
+Rule: training data for the shipped model must be Apache/MIT/CC0/own; NC and research-only sets are for evaluation and ablations only.
+
 ## 2. Risks the original plan missed
 
 | Risk | Why it matters | Check |
