@@ -141,7 +141,7 @@ Code and adapter weights in this repository: **Apache 2.0** (see `LICENSE` and `
 - **Created using Bonsai by Prism ML.** Ternary Bonsai 2 27B is Apache 2.0, © Prism ML, Inc., built from Qwen3.8-27B (© Alibaba Cloud, Apache 2.0). Base weights are not redistributed here.
 - [PrismML llama.cpp fork](https://github.com/PrismML-Eng/llama.cpp): MIT, © the ggml authors. The files under `tools/` are written against it.
 - Training recipe, prompt template and verbalizers follow [autotrust/JEV-9B](https://huggingface.co/autotrust/JEV-9B) and [JEV-27B](https://huggingface.co/autotrust/JEV-27B) (Apache 2.0).
-- Trained on [SargeDev/jev-distill-corpus-v3](https://huggingface.co/datasets/SargeDev/jev-distill-corpus-v3) (Apache 2.0; `openjev_v2` stream CC0). Its `yuri_v3` labels (2/3 of the corpus) are output distributions of TypeSafe's Jev 1.13; check TypeSafe's API terms before commercial use of a model trained on them. A build on the CC0/Apache-only streams is planned.
+- Trained on [SargeDev/jev-distill-corpus-v3](https://huggingface.co/datasets/SargeDev/jev-distill-corpus-v3) (Apache 2.0; `openjev_v2` stream CC0). This is the same corpus JEV-9B and JEV-27B were trained on and released under Apache 2.0. Its `yuri_v3` labels (2/3 of the corpus) are output distributions of TypeSafe's Jev 1.13; as with JEV, users planning commercial use may want to review TypeSafe's API terms themselves.
 - VL-RewardBench is used for evaluation only (its card states research use only); it is not redistributed or trained on.
 
 ## Acknowledgements
