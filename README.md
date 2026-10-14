@@ -35,7 +35,7 @@ KL(target ‖ model), lower is better, after per-kind temperature. "Jev-labelled
 | Bonsai 2 27B zero-shot (no adapter, letter logits) | 0.443 | 0.481 | 0.167 | 0.724 | 0.595 |
 | JEV-9B (published) | 0.019 | 0.021 | 0.005 | 0.023 | 0.028 |
 | JEV-27B (published) | 0.017 | 0.019 | | | |
-| **Bonsai-JEV** | *TBD* | *TBD* | *TBD* | *TBD* | *TBD* |
+| **Bonsai-JEV** (step 3,750) | **0.0165** | 0.020 | 0.004 | 0.021 | 0.025 |
 
 \* Our "all" excludes the 2,260 `yuri_v1` rows whose labels are placeholder `[0.5, 0.5]`; JEV's includes them.
 

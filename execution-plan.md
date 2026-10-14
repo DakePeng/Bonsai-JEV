@@ -287,6 +287,22 @@ In every row also record single-order accuracy, order-agree, and hallucination s
 
 **Joint training is the end state.** P5 itself is a mixed run (text and image rows in one stratified sampler). The text-only run before it exists only the first time, as the control and as the trainer's validation against JEV's published curve. Every later retrain (business images, new data mix) is a single joint run from scratch, one round, no separate text stage.
 
+### Run 1 result (2026-10-14)
+
+Training finished 21:48 (4,000 steps, 2× PRO 6000, ~23.8 h). Validation KL plateaued: 0.0180 at both 3,750 and 4,000; `best` = step 3,750. `test_set_30k` (PyTorch path, temperature applied):
+
+| Jev-labelled rows (yuri_v3, 25,376) | KL | top-1 vs Jev | ECE vs target probs* |
+|---|---:|---:|---:|
+| all | **0.0165** | 91.9% | 0.0005 |
+| noul | 0.0041 | 95.8% | 0.0007 |
+| score | 0.0207 | 89.0% | 0.0007 |
+| choice | 0.0248 | 90.7% | 0.0010 |
+| JEV-27B (published) | 0.017 (noul 0.004 / score 0.021 / choice 0.025) | noul 95.9 / score 89.1 / choice 90.5 | 0.0009 |
+| JEV-9B (published) | 0.019 (0.005 / 0.023 / 0.028) | | |
+
+All non-placeholder rows 0.0204 (openjev_v2 0.063). Fitted temperatures noul 1.014, score 1.000, choice 1.017 (JEV-27B: 1.014 / 1.004 / 1.016): training is already calibrated. **Run 1 reproduces JEV-27B on text on a 7.2 GB ternary base; no second stage needed.**
+\* Reliability against the soft targets (bin predicted option probabilities, compare with the target probabilities). The `eval_text.py` "ECE" (max-prob confidence vs argmax agreement) is not meaningful for a model distilled to soft labels and is not reported.
+
 ## 4. Budget
 
 RTX PRO 6000 96GB at ¥6.98/h per card.

@@ -56,7 +56,7 @@ The same weights also serve **System 2**: with the adapter switched off, the ser
 | Ternary Bonsai 2 27B, zero-shot (letter logits) | 0.443 | 0.167 | 0.724 | 0.595 |
 | JEV-9B (published) | 0.019 | 0.005 | 0.023 | 0.028 |
 | JEV-27B (published) | 0.017 | | | |
-| **Bonsai-JEV** | *TBD* | *TBD* | *TBD* | *TBD* |
+| **Bonsai-JEV** | **0.0165** | 0.004 | 0.021 | 0.025 |
 
 Validation KL during training (1,024 rows, no temperature): 0.070 at step 250, 0.035 at 1,000, 0.025 at 2,000, **0.019 at 3,250** (noul 0.004, score 0.021, choice 0.033); final *TBD*.
 
