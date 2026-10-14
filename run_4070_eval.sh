@@ -28,11 +28,15 @@ python3 fork_eval.py --compare results/base_test30k.logits.jsonl results/base_ch
 
 for CK in "$@"; do
   T=$(basename "$CK")_$(python3 -c "import json;print(json.load(open('$CK/head.json'))['step'])")
-  log "== $T: export"
-  python3 export_gguf_lora.py --ckpt "$CK" --out "$CK/adapter.gguf" 2>&1 | tail -1
-  log "$T: calibration logits"
-  python3 fork_eval.py --adapter-dir "$CK" --split calibration --out results/${T}_calib.logits.jsonl | tail -1
-  python3 calibrate.py --logits results/${T}_calib.logits.jsonl --split calibration --out "$CK/calibration.json" 2>&1 | grep -v Warning
+  if [ -f "$CK/calibration.json" ] && [ -f results/${T}_calib.logits.jsonl ]; then
+    log "== $T: export and calibration already done, resuming at test_set_30k"   # ponytail: resume after a reboot
+  else
+    log "== $T: export"
+    python3 export_gguf_lora.py --ckpt "$CK" --out "$CK/adapter.gguf" 2>&1 | tail -1
+    log "$T: calibration logits"
+    python3 fork_eval.py --adapter-dir "$CK" --split calibration --out results/${T}_calib.logits.jsonl | tail -1
+    python3 calibrate.py --logits results/${T}_calib.logits.jsonl --split calibration --out "$CK/calibration.json" 2>&1 | grep -v Warning
+  fi
   log "$T: test_set_30k logits"
   python3 fork_eval.py --adapter-dir "$CK" --split test_set_30k --out results/${T}_test30k.logits.jsonl | tail -1
   echo "== $T test_set_30k, no temperature"
