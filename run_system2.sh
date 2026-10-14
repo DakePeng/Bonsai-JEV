@@ -4,6 +4,7 @@
 set -u
 ADAPTER=${1:?adapter.gguf}
 cd ~/bonsai/jev && . ~/bonsai/venv/bin/activate && mkdir -p results
+rm -f results/s2_base.json results/s2_off.json results/s2_on.json   # never compare against a stale run
 M=~/bonsai/models/bonsai2-27b; B=~/bonsai/llama.cpp/build/bin
 start() {
   setsid nohup $B/llama-server -m $M/Ternary-Bonsai-2-27B-PQ2_0.gguf "$@" -ngl 99 -c 4096 -np 1 --port 8080 --host 127.0.0.1 \

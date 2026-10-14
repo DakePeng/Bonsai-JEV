@@ -7,7 +7,7 @@ cd ~/bonsai/jev && . ~/bonsai/venv/bin/activate && mkdir -p results
 export GGUF_PY=~/bonsai/llama.cpp/gguf-py
 M=~/bonsai/models/bonsai2-27b; BIN=~/bonsai/llama.cpp/build/bin
 log() { echo; echo "[$(date +%H:%M)] ===== $*"; }
-stop_all() { bash run_decide.sh stop > /dev/null 2>&1; pkill -f "[l]lama-server .*--port 8080"; sleep 3; }
+stop_all() { bash run_decide.sh stop > /dev/null 2>&1; }
 
 # ---- 0. pick the checkpoint
 read FINAL TAG < <(python3 - <<'EOF'
@@ -26,7 +26,7 @@ EOF
 )
 log "selected $TAG ($FINAL)"
 for t in results/*_test30k_cal.metrics.json; do python3 -c "import json;m=json.load(open('$t'));print('$t', 'Jev-labelled KL', round(m['src:yuri_v3']['kl'],5))"; done
-cp -r "$FINAL" ~/bonsai/ckpt-run1/final 2>/dev/null; echo "$TAG" > ~/bonsai/ckpt-run1/final/SELECTED
+rm -rf ~/bonsai/ckpt-run1/final; cp -r "$FINAL" ~/bonsai/ckpt-run1/final; echo "$TAG" > ~/bonsai/ckpt-run1/final/SELECTED
 
 # ---- 1. VL-RewardBench (deployment path, adapter + head bias + choice temperature)
 log "VL-RewardBench"
