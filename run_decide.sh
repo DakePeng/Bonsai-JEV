@@ -3,6 +3,8 @@
 #   bash run_decide.sh start [ADAPTER_DIR]    ADAPTER_DIR holds adapter.gguf + decision.json (omit = zero-shot base);
 #                                             the release repo also holds the base GGUF + mmproj and is used as the model dir
 #   bash run_decide.sh stop
+# env: BASE_GGUF (default Ternary-Bonsai-2-27B-PQ2_0.gguf; PTQ1_0 for tight memory), ADAPTER_FILE (default adapter.gguf),
+#      MMPROJ=gpu|cpu|none (default gpu; cpu runs the vision encoder on the CPU to save ~0.9 GB VRAM), CTX, NP
 set -u
 cd ~/bonsai/jev
 M=${MODEL_DIR:-~/bonsai/models/bonsai2-27b}
@@ -19,12 +21,18 @@ case "${1:-start}" in
     stop > /dev/null
     ADAPTER=${2:-}
     # all-in-one release repo: the base GGUF and mmproj sit next to adapter.gguf
-    [ -n "$ADAPTER" ] && [ -f "$ADAPTER/Ternary-Bonsai-2-27B-PQ2_0.gguf" ] && M=$ADAPTER
+    BASE=${BASE_GGUF:-Ternary-Bonsai-2-27B-PQ2_0.gguf}
+    [ -n "$ADAPTER" ] && [ -f "$ADAPTER/$BASE" ] && M=$ADAPTER
     LORA=""; DJ=""
-    if [ -n "$ADAPTER" ]; then LORA="--lora $ADAPTER/adapter.gguf --lora-init-without-apply"; DJ="$ADAPTER/decision.json"; fi
+    if [ -n "$ADAPTER" ]; then LORA="--lora $ADAPTER/${ADAPTER_FILE:-adapter.gguf} --lora-init-without-apply"; DJ="$ADAPTER/decision.json"; fi
+    case "${MMPROJ:-gpu}" in
+      gpu)  MM="--mmproj $M/Ternary-Bonsai-2-27B-mmproj-Q8_0.gguf" ;;
+      cpu)  MM="--mmproj $M/Ternary-Bonsai-2-27B-mmproj-Q8_0.gguf --no-mmproj-offload" ;;
+      none) MM="" ;;
+    esac
     # -np 2: two slots; the server routes a request to the slot with the longest common prefix.
     # --cache-ram / --cache-reuse: keep evicted prompts in RAM and reuse partial prefixes (KNOWN_ISSUES.md).
-    setsid nohup $BIN/llama-server -m $M/Ternary-Bonsai-2-27B-PQ2_0.gguf --mmproj $M/Ternary-Bonsai-2-27B-mmproj-Q8_0.gguf \
+    setsid nohup $BIN/llama-server -m $M/$BASE $MM \
       $LORA -ngl 99 -c ${CTX:-8192} -np ${NP:-2} --cache-ram 16384 --cache-reuse 256 --port $LPORT --host 127.0.0.1 \
       > results/llama_server.log 2>&1 < /dev/null &
     for i in $(seq 1 60); do curl -sf http://127.0.0.1:$LPORT/health > /dev/null && break; sleep 2; done

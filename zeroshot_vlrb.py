@@ -62,8 +62,16 @@ def main():
     ap.add_argument("--extra", default="", help="extra tool args, e.g. '--image-min-tokens 1024'")
     ap.add_argument("--out", default="results/zs_vlrb")
     ap.add_argument("--from-logits", default=None)
+    ap.add_argument("--adapter-dir", default=None, help="dir with adapter.gguf + decision.json (head bias, temperatures)")
     args = ap.parse_args()
 
+    global BIAS, T_CHOICE
+    BIAS, T_CHOICE = [0.0] * 24, 1.0
+    if args.adapter_dir:
+        dec = json.load(open(os.path.join(args.adapter_dir, "decision.json")))
+        BIAS = dec.get("head_bias", BIAS)
+        T_CHOICE = dec.get("per_kind_temperature", {}).get("choice", 1.0)
+        print(f"adapter {args.adapter_dir}: choice temperature {T_CHOICE:.4f}", file=sys.stderr)
     df = load(args.parquet, args.img_dir)
     if args.limit:
         df = df.head(args.limit)
@@ -82,6 +90,8 @@ def main():
         raw = args.out + ".logits.jsonl"
         env = dict(os.environ, CANDS="32,33")
         cmd = [args.tool, "-m", args.model, "--mmproj", args.mmproj, "-ngl", "99", "-c", str(args.ctx), "--log-disable"] + args.extra.split()
+        if args.adapter_dir:
+            cmd += ["--lora", os.path.join(args.adapter_dir, "adapter.gguf")]
         with open(pin) as fi, open(raw, "w") as fo:
             subprocess.run(cmd, stdin=fi, stdout=fo, env=env, check=True)
         outs = [json.loads(l) for l in open(raw)]
@@ -91,6 +101,8 @@ def main():
         if "error" in o:
             return None
         za, zb = o["logits"]
+        # adapter: the head bias of choice slots A/B (slots 8, 9) and the choice temperature, as the server applies them
+        za, zb = (za + BIAS[8]) / T_CHOICE, (zb + BIAS[9]) / T_CHOICE
         return 1 / (1 + math.exp(zb - za))
 
     res, skipped = [], 0
@@ -115,8 +127,12 @@ def main():
     agree = 100 * sum(x["order_agree"] for x in res) / max(1, len(res))
     for d in doms:
         print(f"{d:14s} n={sum(x['domain'] == d for x in res):5d} acc={per[d]:.1f}")
+    single_ab = 100 * sum((x["p_order_ab"] > 0.5) == x["first_is_better"] for x in res) / max(1, len(res))
+    single_ba = 100 * sum((x["p_order_ba"] > 0.5) == x["first_is_better"] for x in res) / max(1, len(res))
     print(f"{'overall':14s} n={len(res):5d} acc={overall:.1f}  macro={macro:.1f}  order-agree={agree:.1f}")
-    json.dump({"per_domain": per, "overall": overall, "macro": macro, "order_agree": agree, "rows": res},
+    print(f"{'single order':14s} as-given {single_ab:.1f}  swapped {single_ba:.1f}  (one forward pass, no averaging)")
+    json.dump({"per_domain": per, "overall": overall, "macro": macro, "order_agree": agree,
+               "single_order": {"ab": single_ab, "ba": single_ba}, "rows": res},
               open(args.out + ".json", "w"), indent=1)
 
 
