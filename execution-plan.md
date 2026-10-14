@@ -287,6 +287,15 @@ In every row also record single-order accuracy, order-agree, and hallucination s
 
 **Joint training is the end state.** P5 itself is a mixed run (text and image rows in one stratified sampler). The text-only run before it exists only the first time, as the control and as the trainer's validation against JEV's published curve. Every later retrain (business images, new data mix) is a single joint run from scratch, one round, no separate text stage.
 
+### Decision Index run (decided 2026-10-14, on the 4070)
+
+Needed before any "Pareto frontier" claim: the text-only result (Jev-corpus KL = JEV-27B at 1/7 the memory) only compares against the JEV family. The DI vision board is where JEV-27B-VL is strong (69.6, rank 3; front by memory: d3-mini 4B 63.2 at ~9 GB, d3-flash 9B 66.9 at ~17 GB); the text board has JEV-27B at 55.6 (rank 27).
+1. Add a `/v1/systemone` route to `decide_server.py` (TypeSafe request shape, same translation as `jevbench_eval.py`) for the kit's `http` engine; check whether the vision kit's `decide` engine speaks our `/v1/decide`.
+2. Rebuild the suites on the 4070 (vision ~5.7 GB; text ~7 GB, needs the HLE terms accepted on the user's HF account).
+3. Validate both pipelines on `suite sample --n 100`, then run the full public suites in the background: vision 12,210 rows (~10 h), text ~140k requests (~10–20 h).
+4. Then decide the wording: frontier claim only if the vision score clears d3-mini (63.2) at ~9 GB; submit to the board (the board's latency rule is measured on one RTX PRO 6000; our 4070 numbers are an upper bound).
+Release does not wait for this; README/model cards get the DI numbers when they land.
+
 ### Run 1 result (2026-10-14)
 
 Training finished 21:48 (4,000 steps, 2× PRO 6000, ~23.8 h). Validation KL plateaued: 0.0180 at both 3,750 and 4,000; `best` = step 3,750. `test_set_30k` (PyTorch path, temperature applied):
