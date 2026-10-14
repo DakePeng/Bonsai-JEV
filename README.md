@@ -11,6 +11,8 @@
 | Runs on | H100 / B200 | RTX 4070 12 GB (tested); Jetson Orin NX 16 GB and Apple Silicon via the fork (not yet tested with the adapter) |
 | Trainable | 108.8M LoRA + 123k head | same recipe, same shapes |
 
+> **Independent project.** Bonsai-JEV is built by an independent developer. It is not affiliated with, endorsed by, or sponsored by AutoTrust (autotrust), TypeSafe, or Prism ML. Their names appear only to credit their work and to identify the models and data this project builds on; all trademarks belong to their owners.
+
 ## Built on
 
 This project stands on two releases and would not exist without them:

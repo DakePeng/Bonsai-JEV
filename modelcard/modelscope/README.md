@@ -32,6 +32,8 @@ tags:
 
 [English model card on Hugging Face](https://huggingface.co/dakebakery/Bonsai-JEV)
 
+> **独立项目。** Bonsai-JEV 由一位独立开发者完成，与 AutoTrust（autotrust）、TypeSafe、Prism ML 均无隶属关系，也未获得它们的认可或赞助。文中提到它们的名字，只是为了致谢和注明本项目所基于的模型与数据；相关商标归各自所有者。
+
 ## 基于
 
 - **[Ternary Bonsai 2 27B](https://modelscope.cn/models/prism-ml/Ternary-Bonsai-2-27B-gguf)，作者 Prism ML**（Apache 2.0）。*Created using Bonsai by Prism ML.* 它的三值权重是冻结底座，原样不动，本仓库附带一份逐字节一致的副本；它的 [llama.cpp 分支](https://github.com/PrismML-Eng/llama.cpp)是运行时。Bonsai 2 基于阿里云的 Qwen3.8-27B（Apache 2.0）。

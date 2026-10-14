@@ -31,6 +31,8 @@ The same weights also serve **System 2**: with the adapter switched off, the ser
 
 > **Status (2026-10-15):** trained; all numbers below are measured through the deployment path (the fork running `adapter.gguf` on the ternary file). JevBench-231, the agent-judge benchmarks and the Decision Index run are pending.
 
+> **Independent project.** Bonsai-JEV is built by an independent developer. It is not affiliated with, endorsed by, or sponsored by AutoTrust (autotrust), TypeSafe, or Prism ML. Their names appear only to credit their work and to identify the models and data this project builds on; all trademarks belong to their owners.
+
 ## Built on
 
 - **[Ternary Bonsai 2 27B](https://huggingface.co/prism-ml/Ternary-Bonsai-2-27B-gguf) by [Prism ML](https://huggingface.co/prism-ml)** (Apache 2.0). *Created using Bonsai by Prism ML.* Its ternary weights are the frozen base, unchanged and included here byte-identical; its [llama.cpp fork](https://github.com/PrismML-Eng/llama.cpp) is the runtime. Bonsai 2 is built from Qwen3.8-27B by Alibaba Cloud (Apache 2.0).
