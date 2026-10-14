@@ -25,7 +25,7 @@ tags:
 
 # Bonsai-JEV
 
-**A calibrated, image-capable 27B decision model in ~9 GB.** The [JEV](https://huggingface.co/autotrust/JEV-27B) recipe (a LoRA plus a 24-slot decision head, distilled to soft labels) trained on [Ternary Bonsai 2 27B](https://huggingface.co/prism-ml/Ternary-Bonsai-2-27B-gguf), Prism ML's ternary compression of Qwen3.8-27B. Ask a typed question (yes/no, 0–5 score, or 2–16-way choice) about a state that can include images; one forward pass returns calibrated probabilities over the options. No text is generated.
+**A calibrated, image-capable 27B decision model that fits on an 8 GB GPU.** The [JEV](https://huggingface.co/autotrust/JEV-27B) recipe (a LoRA plus a 24-slot decision head, distilled to soft labels) trained on [Ternary Bonsai 2 27B](https://huggingface.co/prism-ml/Ternary-Bonsai-2-27B-gguf), Prism ML's ternary compression of Qwen3.8-27B. Ask a typed question (yes/no, 0–5 score, or 2–16-way choice) about a state that can include images; one forward pass returns calibrated probabilities over the options. No text is generated.
 
 The same weights also serve **System 2**: with the adapter switched off, the server is Ternary Bonsai 2 itself, byte for byte.
 
@@ -44,7 +44,7 @@ The same weights also serve **System 2**: with the adapter switched off, the ser
 |---|---|---|
 | Base | Qwen3.8-27B, BF16 | Ternary Bonsai 2 27B, PQ2_0 (2.13 bits/weight) |
 | Download | ~54 / ~56 GB | **~8.7 GB** (PQ2_0) or ~7.4 GB (PTQ1_0) |
-| Runs on | one 80 GB+ GPU (vLLM) | 12 GB GPU (RTX 4070 tested); Jetson Orin NX 16 GB and Apple Silicon via the fork (not yet tested with the adapter) |
+| Runs on | one 80 GB+ GPU (vLLM) | **8 GB GPU** with PTQ1_0 (~7.1 GiB peak incl. vision, 4k context; simulated on an RTX 4070 capped at 7.5 GiB); 12 GB GPU (RTX 4070 tested); Jetson Orin NX 16 GB and Apple Silicon via the fork (not yet tested with the adapter) |
 | Trainable parameters | 108.8M LoRA + 123k head | same recipe, same shapes |
 | Images | zero-shot | zero-shot |
 | System 2 | unmodified Qwen3.8-27B | unmodified Ternary Bonsai 2 27B |

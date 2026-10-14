@@ -1,14 +1,14 @@
 # Bonsai-JEV
 
-**A calibrated, image-capable 27B decision model that runs in ~9 GB.** The [JEV](https://huggingface.co/autotrust/JEV-27B) recipe (LoRA + 24-slot decision head, distilled to soft labels) trained on top of [Ternary Bonsai 2 27B](https://huggingface.co/prism-ml/Ternary-Bonsai-2-27B-gguf), PrismML's ternary (−1/0/+1) compression of Qwen3.8-27B. The base stays ternary and frozen; the adapter is a separate file. One forward pass returns calibrated probabilities over the options of a typed question (yes/no, 0–5 score, or 2–16-way choice), with or without images.
+**A calibrated, image-capable 27B decision model that fits on an 8 GB GPU.** The [JEV](https://huggingface.co/autotrust/JEV-27B) recipe (LoRA + 24-slot decision head, distilled to soft labels) trained on top of [Ternary Bonsai 2 27B](https://huggingface.co/prism-ml/Ternary-Bonsai-2-27B-gguf), PrismML's ternary (−1/0/+1) compression of Qwen3.8-27B. The base stays ternary and frozen; the adapter is a separate file. One forward pass returns calibrated probabilities over the options of a typed question (yes/no, 0–5 score, or 2–16-way choice), with or without images.
 
 [中文说明](README.zh.md)
 
 | | JEV-27B / JEV-27B-VL | **Bonsai-JEV** |
 |---|---|---|
 | Base | Qwen3.8-27B, BF16 | Ternary Bonsai 2 27B, PQ2_0 (2.13 bpw) |
-| Weights in memory | ~54 GB (vLLM, one 80 GB GPU) | **7.2 GB** base + 0.6 GB vision + 0.46 GB adapter |
-| Runs on | H100 / B200 | RTX 4070 12 GB (tested); Jetson Orin NX 16 GB and Apple Silicon via the fork (not yet tested with the adapter) |
+| Weights in memory | ~54 GB (vLLM, one 80 GB GPU) | **5.95 GB** base (PTQ1_0) + 0.6 GB vision + 0.23 GB fp16 adapter; or 7.2 GB base (PQ2_0) + 0.46 GB adapter |
+| Runs on | H100 / B200 | **8 GB GPU** with PTQ1_0 (~7.1 GiB peak with vision and 4k context; simulated by capping an RTX 4070 at 7.5 GiB); RTX 4070 12 GB (tested); Jetson Orin NX 16 GB and Apple Silicon via the fork (not yet tested with the adapter) |
 | Trainable | 108.8M LoRA + 123k head | same recipe, same shapes |
 
 > **Independent project.** Bonsai-JEV is built by an independent developer. It is not affiliated with, endorsed by, or sponsored by AutoTrust (autotrust), TypeSafe, or Prism ML. Their names appear only to credit their work and to identify the models and data this project builds on; all trademarks belong to their owners.

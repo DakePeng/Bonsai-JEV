@@ -24,7 +24,7 @@ tags:
 
 # Bonsai-JEV
 
-**约 9 GB 就能跑、能看图、输出校准概率的 27B 决策模型。** 把 [JEV](https://modelscope.cn/models/autotrust/JEV-27B) 的配方（LoRA + 24 位决策头，用软标签蒸馏）训练在 [Ternary Bonsai 2 27B](https://modelscope.cn/models/prism-ml/Ternary-Bonsai-2-27B-gguf) 上。后者是 Prism ML 把 Qwen3.8-27B 压缩成三值的版本。对一个有类型的问题（是/否、0–5 打分、2–16 选 1）提问，状态里可以带图，一次前向就输出各选项的校准概率，不生成文字。
+**8 GB 显卡就能跑、能看图、输出校准概率的 27B 决策模型。** 把 [JEV](https://modelscope.cn/models/autotrust/JEV-27B) 的配方（LoRA + 24 位决策头，用软标签蒸馏）训练在 [Ternary Bonsai 2 27B](https://modelscope.cn/models/prism-ml/Ternary-Bonsai-2-27B-gguf) 上。后者是 Prism ML 把 Qwen3.8-27B 压缩成三值的版本。对一个有类型的问题（是/否、0–5 打分、2–16 选 1）提问，状态里可以带图，一次前向就输出各选项的校准概率，不生成文字。
 
 同一套权重也提供 **System 2**：把适配器关掉，服务就是 Ternary Bonsai 2 本身，逐字节一致。
 
@@ -45,7 +45,7 @@ tags:
 |---|---|---|
 | 底座 | Qwen3.8-27B，BF16 | Ternary Bonsai 2 27B，PQ2_0（2.13 bit/权重） |
 | 下载大小 | 约 54 / 56 GB | **约 8.7 GB**（PQ2_0）或约 7.4 GB（PTQ1_0） |
-| 能跑在 | 一张 80 GB 以上的卡（vLLM） | 12 GB 显卡（RTX 4070 已测）；Jetson Orin NX 16 GB 和 Apple Silicon 走分支的后端（尚未带适配器测试） |
+| 能跑在 | 一张 80 GB 以上的卡（vLLM） | **8 GB 显卡**，用 PTQ1_0（带视觉和 4k 上下文峰值约 7.1 GiB；在 RTX 4070 上把显存限制到 7.5 GiB 模拟）；12 GB 显卡（RTX 4070 已测）；Jetson Orin NX 16 GB 和 Apple Silicon 走分支的后端（尚未带适配器测试） |
 | 训练参数 | 1.088 亿 LoRA + 12.3 万决策头 | 同一配方、同样的形状 |
 | 看图 | 零样本 | 零样本 |
 | System 2 | 未改动的 Qwen3.8-27B | 未改动的 Ternary Bonsai 2 27B |
