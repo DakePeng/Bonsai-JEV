@@ -20,6 +20,8 @@
 
 Bonsai-JEV 就是把 JEV 的配方用在 Bonsai 2 底座上；两部分思路的功劳都属于各自的作者。
 
+另外感谢 **ChezRD 的 [bonjev](https://github.com/ChezRD/bonjev)**（MIT），一条更早的、不训练的 Ternary Bonsai 决策路线：一个基于 Prism llama.cpp 库的 Rust 引擎，把现成的决策 LoRA 增量组合起来。它公开的 [JevBench-231](https://github.com/fstandhartinger/jevbench) 和 Decision Index 评测协议与成绩，是我们对照的外部基准（`jevbench_eval.py` 的判分方式和它的考试完全一致）。
+
 > **状态（2026-10-14）：训练进行中。** 下面是验证集 KL；测试集数字、发布的适配器和看图评测在训练结束后补上。标 *待测* 的还没有测。
 
 ## 结果
@@ -54,6 +56,17 @@ KL(目标 ‖ 模型)，越低越好，按类型温度校准后。"Jev 标注的
 | JEV-9B（公开） | | | | 74.3 | |
 | JEV-27B-VL（公开） | 58.0 | 83.2 | 78.2 | 78.3 | 89% |
 | **Bonsai-JEV** | *待测* | *待测* | *待测* | *待测* | *待测* |
+
+### JevBench-231（top-1 准确率，按 bonjev 的判分方式）
+
+| 模型 | 提示词 | 答对 |
+|---|---|---:|
+| Ternary Bonsai 2 27B 零样本 | bonjev 自己的模板 | 194 / 231（公开） |
+| bonjev `vega_clef_plumb`（不训练、合并 LoRA 增量） | bonjev 自己的模板 | 207 / 231（公开） |
+| Ternary Bonsai 2 27B 零样本 | JEV `bare-v1`，经 `jevbench_eval.py` 转换 | 166 / 231（easy 47/48、original 58/72、hard 61/111） |
+| **Bonsai-JEV** | JEV `bare-v1`，经 `jevbench_eval.py` 转换 | *待测* |
+
+同一个底座，两种提示词的零样本差了 28 题：提示词的渲染方式影响很大。所以比较时既看绝对题数，也看每个适配器相对"同一提示词下零样本"的提升。231 题里 ±6 题以内是噪声。
 
 顺序一致率是把两个回答换位后结论不变的比例。三值底座单看任一种顺序接近抛硬币，平均分把这一点掩盖了，所以每个模型都报这一列。
 

@@ -20,6 +20,8 @@ This project stands on two releases and would not exist without them:
 
 Bonsai-JEV is the JEV recipe applied to the Bonsai 2 base; credit for both ideas belongs to their authors.
 
+Also thanks to **[bonjev](https://github.com/ChezRD/bonjev) by ChezRD** (MIT), an earlier, training-free route to decisions on Ternary Bonsai: a Rust engine over the Prism llama.cpp libraries that combines existing decision-LoRA deltas. Its published [JevBench-231](https://github.com/fstandhartinger/jevbench) and Decision Index protocol and numbers are the external comparison we report against (`jevbench_eval.py` grades exactly like its exam).
+
 > **Status (2026-10-14): training in progress.** Validation KL is below; test-set numbers, the released adapter and the image benchmarks will be filled in when the run finishes. Entries marked *TBD* are not measured yet.
 
 ## Results
@@ -54,6 +56,17 @@ Same protocol as the [JEV demo](https://github.com/yuhai-china/JEV-27B-DEMO/tree
 | JEV-9B (published) | | | | 74.3 | |
 | JEV-27B-VL (published) | 58.0 | 83.2 | 78.2 | 78.3 | 89% |
 | **Bonsai-JEV** | *TBD* | *TBD* | *TBD* | *TBD* | *TBD* |
+
+### JevBench-231 (top-1 accuracy, bonjev's grading)
+
+| Model | prompt | correct |
+|---|---|---:|
+| Ternary Bonsai 2 27B, zero-shot | bonjev's own template | 194 / 231 (published) |
+| bonjev `vega_clef_plumb` (training-free LoRA merge) | bonjev's own template | 207 / 231 (published) |
+| Ternary Bonsai 2 27B, zero-shot | JEV `bare-v1` via `jevbench_eval.py` | 166 / 231 (easy 47/48, original 58/72, hard 61/111) |
+| **Bonsai-JEV** | JEV `bare-v1` via `jevbench_eval.py` | *TBD* |
+
+The two zero-shot rows differ by 28 tasks on the same base: the prompt rendering matters, so compare each adapter against the zero-shot row that uses its own prompt as well as on the absolute count. 231 tasks: ±6 is noise.
 
 Order-agree is the share of pairs whose verdict survives swapping the two answers. The ternary base alone is near a coin flip per order; the averaged score hides that. We report it for every model.
 
