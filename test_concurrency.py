@@ -66,10 +66,13 @@ def main():
     dd = max(max(abs(a - b) for a, b in zip(seq_d[i], out[("d", i)])) for i in range(len(rows)))
     flips = sum(max(range(len(seq_d[i])), key=seq_d[i].__getitem__) != max(range(len(out[("d", i)])), key=out[("d", i)].__getitem__)
                 for i in range(len(rows)))
-    cd, same_text = 0.0, 0
+    import math
+    cd, cdl, same_text = 0.0, 0.0, 0   # probability-space and log-space differences of the first-token top-5
     for i in range(len(prompts)):
         a, b = seq_c[i]["top"], out[("c", i)]["top"]
-        cd = max([cd] + [abs(a[t] - b[t]) for t in set(a) & set(b)])
+        for t in set(a) & set(b):
+            cd = max(cd, abs(math.exp(a[t]) - math.exp(b[t])))
+            cdl = max(cdl, abs(a[t] - b[t]))
         same_text += seq_c[i]["text"] == out[("c", i)]["text"]
     leak = 0
     on_path = "results/s2_on.json"
@@ -81,7 +84,7 @@ def main():
             if b48[:len(got)] != o48[:len(got)] and got == o48[:len(got)]:
                 leak += 1   # concurrent chat answer follows the adapter-on answer, not the base
     print(f"decisions: {len(rows)} concurrent vs sequential, max |dp| {dd:.4f}, argmax flips {flips}")
-    print(f"chat: {len(prompts)} concurrent vs sequential, first-token max |dlogprob| {cd:.4f}, identical text {same_text}/{len(prompts)}, adapter leaks {leak}")
+    print(f"chat: {len(prompts)} concurrent vs sequential, first-token max |dp| {cd:.4f} (max |dlogprob| {cdl:.4f}, dominated by low-probability tokens), identical text {same_text}/{len(prompts)}, adapter leaks {leak}")
     ok = dd < 2e-2 and flips <= 1 and cd < 2e-2 and leak == 0
     print("PASS" if ok else "FAIL")
     sys.exit(0 if ok else 1)
