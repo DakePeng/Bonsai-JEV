@@ -134,10 +134,16 @@ def decide(req: DecideRequest):
         "n_predict": 1, "n_probs": 1000, "post_sampling_probs": False, "cache_prompt": True, **LORA_ON,
         "temperature": 1.0, "top_k": 0, "top_p": 1.0, "min_p": 0.0, "samplers": [],
     }
-    r = _http.post(f"{LLAMA_URL}/completion", json=body, timeout=600)
-    if not r.ok:
-        raise HTTPException(502, f"llama-server: {r.status_code} {r.text[:300]}")
-    j = r.json()
+    for attempt in range(2):   # ponytail: one retry; seen rarely (~1/150 JevBench rows) a 200 without probabilities
+        r = _http.post(f"{LLAMA_URL}/completion", json=body, timeout=600)
+        if not r.ok:
+            raise HTTPException(502, f"llama-server: {r.status_code} {r.text[:300]}")
+        j = r.json()
+        if j.get("completion_probabilities"):
+            break
+        print(f"llama-server returned no probabilities (attempt {attempt + 1}): {str(j)[:600]}", flush=True)
+    else:
+        raise HTTPException(502, f"llama-server returned no probabilities: {str(j)[:300]}")
     top = {t["id"]: t["logprob"] for t in j["completion_probabilities"][0]["top_logprobs"]}
     floor = min(top.values()) - 1.0                      # a verbalizer outside the top-N is below the N-th
     z = [top.get(t, floor) + BIAS[lo + i] for i, t in enumerate(ids)]

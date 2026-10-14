@@ -91,8 +91,15 @@ def main():
         for r in rows:
             body, aux = translate(r)
             t0 = time.time()
-            d = requests.post(f"{args.url.rstrip('/')}/v1/decide", json=body, timeout=600).json()
+            resp = requests.post(f"{args.url.rstrip('/')}/v1/decide", json=body, timeout=600)
             sec = time.time() - t0
+            if not resp.ok:   # count as wrong, keep going
+                print(f"{r['id']}: HTTP {resp.status_code} {resp.text[:200]}")
+                row = {"id": r["id"], "split": r["_split"], "kind": r["question"]["type"], "ok": False, "error": resp.text[:300]}
+                res.append(row)
+                f.write(json.dumps(row, ensure_ascii=False) + "\n")
+                continue
+            d = resp.json()
             got, conf = predict(r, d["probabilities"], aux)
             exp = str(r["expected"]).lower() if r["question"]["type"] == "noul" else str(r["expected"])
             row = {"id": r["id"], "split": r["_split"], "kind": r["question"]["type"], "expected": exp, "got": got,
@@ -107,7 +114,7 @@ def main():
         print(line(k, [x for x in res if x["kind"] == k]))
     for s in SPLITS:
         print(line(s, [x for x in res if x["split"] == s]))
-    lat = sorted(x["sec"] for x in res)
+    lat = sorted(x["sec"] for x in res if "sec" in x)
     print(f"latency p50 {statistics.median(lat):.3f}s  p95 {lat[int(0.95 * len(lat))]:.3f}s  total {sum(lat):.0f}s")
     print("bonjev reference (27B, its own prompt): base 194/231, vega_clef_plumb 207/231")
     json.dump({"correct": sum(x["ok"] for x in res), "n": len(res)}, open(args.out + ".summary.json", "w"))
