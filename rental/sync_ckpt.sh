@@ -10,8 +10,10 @@ while true; do
   for tag in best last; do
     remote=""
     for try in 1 2 3; do   # the AutoDL gateway / local proxy drops a connection now and then
-      remote=$(ssh -o ConnectTimeout=30 autodl "cat /root/Bonsai-JEV/ckpt/$RUN/$tag/head.json 2>/dev/null" 2>/dev/null | python3 -c "import json,sys;print(json.load(sys.stdin)['step'])" 2>/dev/null)
-      [ -n "$remote" ] && break; sleep 20
+      remote=$(ssh -o ConnectTimeout=30 -o ServerAliveInterval=15 -o ServerAliveCountMax=3 autodl "cat /root/Bonsai-JEV/ckpt/$RUN/$tag/head.json 2>/dev/null" 2>/dev/null | python3 -c "import json,sys;print(json.load(sys.stdin)['step'])" 2>/dev/null)
+      [ -n "$remote" ] && break
+      ssh -O exit autodl 2>/dev/null   # a stale multiplexed master makes every new session hang/fail: drop it
+      sleep 20
     done
     [ -z "$remote" ] && echo "$(date '+%m-%d %H:%M') $tag: rental box unreachable this round"
     local_=$(step_of "ckpt/$RUN/$tag/head.json")
