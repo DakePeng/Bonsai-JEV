@@ -105,9 +105,17 @@ JEV-27B 模型卡上的其他指标，同样的行、同样的定义：
 从源码编译 [PrismML 的 llama.cpp 分支](https://github.com/PrismML-Eng/llama.cpp)（CUDA 或 Metal）。原版 llama.cpp 加载不了这些文件；AVX-512 CPU（比如 AMD Zen 4）上一定要自己编译，发布的二进制一加载就崩。
 
 ```bash
-modelscope download --model dakepeng/Bonsai-JEV --local_dir Bonsai-JEV-weights
-git clone https://github.com/DakePeng/Bonsai-JEV && cd Bonsai-JEV
-bash run_decide.sh start ../Bonsai-JEV-weights      # llama-server 在 :8080，/v1/decide 在 :8000
+pip install fastapi uvicorn requests pydantic pillow
+# 12 GB 以上显卡：PQ2_0 底座（约 8.3 GB）。两个来源任选，国内推荐 ModelScope
+modelscope download --model dakepeng/Bonsai-JEV --exclude "*PTQ1_0*" "adapter_f16.gguf" "peft/*" "head.*" --local_dir Bonsai-JEV-weights
+hf download dakebakery/Bonsai-JEV --exclude "*PTQ1_0*" --exclude "adapter_f16.gguf" --exclude "peft/*" --exclude "head.*" --local-dir Bonsai-JEV-weights
+# 启动 llama-server（:8080）和 /v1/decide 封装（:8000）；LLAMA_BIN 指向分支的 build/bin
+LLAMA_BIN=~/llama.cpp/build/bin bash Bonsai-JEV-weights/run_decide.sh start Bonsai-JEV-weights
+
+# 8 GB 显卡：PTQ1_0 底座 + fp16 适配器（下载约 6.8 GB）
+modelscope download --model dakepeng/Bonsai-JEV --exclude "*PQ2_0*" "adapter.gguf" "peft/*" "head.*" --local_dir Bonsai-JEV-weights
+BASE_GGUF=Ternary-Bonsai-2-27B-PTQ1_0.gguf ADAPTER_FILE=adapter_f16.gguf CTX=4096 NP=1 \
+  LLAMA_BIN=~/llama.cpp/build/bin bash Bonsai-JEV-weights/run_decide.sh start Bonsai-JEV-weights
 ```
 
 ### System 1：类型化决策

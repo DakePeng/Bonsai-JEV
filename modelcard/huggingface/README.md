@@ -104,9 +104,17 @@ Order-agree is the share of pairs whose verdict survives swapping the two answer
 Build the [PrismML llama.cpp fork](https://github.com/PrismML-Eng/llama.cpp) from source with CUDA (or Metal). Stock llama.cpp cannot load these files; on AVX-512 CPUs (e.g. AMD Zen 4) use a source build, the release binaries crash on load.
 
 ```bash
-huggingface-cli download dakebakery/Bonsai-JEV --local-dir Bonsai-JEV-weights
-git clone https://github.com/DakePeng/Bonsai-JEV && cd Bonsai-JEV
-bash run_decide.sh start ../Bonsai-JEV-weights      # llama-server on :8080 + /v1/decide on :8000
+pip install fastapi uvicorn requests pydantic pillow
+# 12 GB+ GPU: PQ2_0 base (~8.3 GB). Either source; ModelScope is faster from mainland China.
+hf download dakebakery/Bonsai-JEV --exclude "*PTQ1_0*" --exclude "adapter_f16.gguf" --exclude "peft/*" --exclude "head.*" --local-dir Bonsai-JEV-weights
+modelscope download --model dakepeng/Bonsai-JEV --exclude "*PTQ1_0*" "adapter_f16.gguf" "peft/*" "head.*" --local_dir Bonsai-JEV-weights
+# start llama-server (:8080) + the /v1/decide wrapper (:8000); LLAMA_BIN = the fork's build/bin
+LLAMA_BIN=~/llama.cpp/build/bin bash Bonsai-JEV-weights/run_decide.sh start Bonsai-JEV-weights
+
+# 8 GB GPU: PTQ1_0 base + fp16 adapter (~6.8 GB download)
+hf download dakebakery/Bonsai-JEV --exclude "*PQ2_0*" --exclude "adapter.gguf" --exclude "peft/*" --exclude "head.*" --local-dir Bonsai-JEV-weights
+BASE_GGUF=Ternary-Bonsai-2-27B-PTQ1_0.gguf ADAPTER_FILE=adapter_f16.gguf CTX=4096 NP=1 \
+  LLAMA_BIN=~/llama.cpp/build/bin bash Bonsai-JEV-weights/run_decide.sh start Bonsai-JEV-weights
 ```
 
 ### System 1: typed decisions

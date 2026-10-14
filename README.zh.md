@@ -117,11 +117,17 @@ JEV-27B 模型卡上的其他指标，同样的行、同样的定义（`kl_break
 推理所需的全部文件（底座 GGUF、视觉投影、适配器、校准）都在同一个模型仓库里，[Hugging Face](https://huggingface.co/dakebakery/Bonsai-JEV) 和 [ModelScope](https://modelscope.cn/models/dakepeng/Bonsai-JEV) 同步发布（发布时上传）。底座就是 Prism ML 的原文件，和适配器验证时用的那份逐字节一致。
 
 ```bash
-# 约 8.7 GB，两个来源任选：
-modelscope download --model dakepeng/Bonsai-JEV --local_dir ~/bonsai/Bonsai-JEV-weights     # 国内推荐
-huggingface-cli download dakebakery/Bonsai-JEV --local-dir ~/bonsai/Bonsai-JEV-weights
-# 启动 llama-server 和 /v1/decide 封装
-bash run_decide.sh start ~/bonsai/Bonsai-JEV-weights
+pip install fastapi uvicorn requests pydantic pillow
+# 12 GB 以上显卡：PQ2_0 底座（约 8.3 GB）。两个来源任选，国内推荐 ModelScope
+modelscope download --model dakepeng/Bonsai-JEV --exclude "*PTQ1_0*" "adapter_f16.gguf" "peft/*" "head.*" --local_dir Bonsai-JEV-weights
+hf download dakebakery/Bonsai-JEV --exclude "*PTQ1_0*" --exclude "adapter_f16.gguf" --exclude "peft/*" --exclude "head.*" --local-dir Bonsai-JEV-weights
+# 启动 llama-server（:8080）和 /v1/decide 封装（:8000）；LLAMA_BIN 指向分支的 build/bin
+LLAMA_BIN=~/llama.cpp/build/bin bash Bonsai-JEV-weights/run_decide.sh start Bonsai-JEV-weights
+
+# 8 GB 显卡：PTQ1_0 底座 + fp16 适配器（下载约 6.8 GB）
+modelscope download --model dakepeng/Bonsai-JEV --exclude "*PQ2_0*" "adapter.gguf" "peft/*" "head.*" --local_dir Bonsai-JEV-weights
+BASE_GGUF=Ternary-Bonsai-2-27B-PTQ1_0.gguf ADAPTER_FILE=adapter_f16.gguf CTX=4096 NP=1 \
+  LLAMA_BIN=~/llama.cpp/build/bin bash Bonsai-JEV-weights/run_decide.sh start Bonsai-JEV-weights
 ```
 
 ```bash

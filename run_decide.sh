@@ -4,11 +4,13 @@
 #                                             the release repo also holds the base GGUF + mmproj and is used as the model dir
 #   bash run_decide.sh stop
 # env: BASE_GGUF (default Ternary-Bonsai-2-27B-PQ2_0.gguf; PTQ1_0 for tight memory), ADAPTER_FILE (default adapter.gguf),
-#      MMPROJ=gpu|cpu|none (default gpu; cpu runs the vision encoder on the CPU to save ~0.9 GB VRAM), CTX, NP
+#      MMPROJ=gpu|cpu|none (default gpu; cpu runs the vision encoder on the CPU to save ~0.9 GB VRAM), CTX, NP,
+#      LLAMA_BIN (dir with the fork's llama-server; default ~/bonsai/llama.cpp/build/bin), VENV (optional, activated if set)
 set -u
-cd ~/bonsai/jev
+[ -n "${2:-}" ] && [ -d "$2" ] && set -- "$1" "$(cd "$2" && pwd)"   # absolute adapter dir before the cd below
+cd "$(dirname "$0")"
 M=${MODEL_DIR:-~/bonsai/models/bonsai2-27b}
-BIN=~/bonsai/llama.cpp/build/bin
+BIN=${LLAMA_BIN:-~/bonsai/llama.cpp/build/bin}
 LPORT=${LPORT:-8080}
 PORT=${PORT:-8000}
 mkdir -p results
@@ -23,6 +25,7 @@ stop() {
 case "${1:-start}" in
   stop) stop; exit 0 ;;
   start)
+    [ -x "$BIN/llama-server" ] || { echo "llama-server not found in $BIN; set LLAMA_BIN to the fork's build/bin"; exit 1; }
     stop > /dev/null
     ADAPTER=${2:-}
     # all-in-one release repo: the base GGUF and mmproj sit next to adapter.gguf
@@ -46,7 +49,7 @@ case "${1:-start}" in
     # --lora-init-without-apply alone does not take effect in this fork's server, so set it explicitly.
     [ -n "$ADAPTER" ] && curl -sf -X POST http://127.0.0.1:$LPORT/lora-adapters -H "content-type: application/json" \
       -d '[{"id": 0, "scale": 0}]' > /dev/null && echo "adapter loaded, global scale 0: $(curl -s http://127.0.0.1:$LPORT/lora-adapters)"
-    . ~/bonsai/venv/bin/activate
+    VENV=${VENV:-~/bonsai/venv}; [ -f "$VENV/bin/activate" ] && . "$VENV/bin/activate"
     LLAMA_URL=http://127.0.0.1:$LPORT DECISION_JSON=$DJ setsid nohup uvicorn decide_server:app --host 0.0.0.0 --port $PORT \
       > results/decide_server.log 2>&1 < /dev/null &
     for i in $(seq 1 30); do curl -sf http://127.0.0.1:$PORT/health > /dev/null && break; sleep 1; done

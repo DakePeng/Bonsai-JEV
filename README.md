@@ -117,11 +117,17 @@ Requires the [PrismML llama.cpp fork](https://github.com/PrismML-Eng/llama.cpp) 
 Everything needed to serve (base GGUF, vision projector, adapter, calibration) is in one model repo, mirrored on [Hugging Face](https://huggingface.co/dakebakery/Bonsai-JEV) and [ModelScope](https://modelscope.cn/models/dakepeng/Bonsai-JEV) (uploaded at release). The base is Prism ML's file, byte-identical to the one the adapter was validated against.
 
 ```bash
-# ≈ 8.7 GB. Either source:
-huggingface-cli download dakebakery/Bonsai-JEV --local-dir ~/bonsai/Bonsai-JEV-weights
-modelscope download --model dakepeng/Bonsai-JEV --local_dir ~/bonsai/Bonsai-JEV-weights     # faster from mainland China
-# start llama-server + the /v1/decide wrapper
-bash run_decide.sh start ~/bonsai/Bonsai-JEV-weights
+pip install fastapi uvicorn requests pydantic pillow
+# 12 GB+ GPU: PQ2_0 base (~8.3 GB). Either source; ModelScope is faster from mainland China.
+hf download dakebakery/Bonsai-JEV --exclude "*PTQ1_0*" --exclude "adapter_f16.gguf" --exclude "peft/*" --exclude "head.*" --local-dir Bonsai-JEV-weights
+modelscope download --model dakepeng/Bonsai-JEV --exclude "*PTQ1_0*" "adapter_f16.gguf" "peft/*" "head.*" --local_dir Bonsai-JEV-weights
+# start llama-server (:8080) + the /v1/decide wrapper (:8000); LLAMA_BIN = the fork's build/bin
+LLAMA_BIN=~/llama.cpp/build/bin bash Bonsai-JEV-weights/run_decide.sh start Bonsai-JEV-weights
+
+# 8 GB GPU: PTQ1_0 base + fp16 adapter (~6.8 GB download)
+hf download dakebakery/Bonsai-JEV --exclude "*PQ2_0*" --exclude "adapter.gguf" --exclude "peft/*" --exclude "head.*" --local-dir Bonsai-JEV-weights
+BASE_GGUF=Ternary-Bonsai-2-27B-PTQ1_0.gguf ADAPTER_FILE=adapter_f16.gguf CTX=4096 NP=1 \
+  LLAMA_BIN=~/llama.cpp/build/bin bash Bonsai-JEV-weights/run_decide.sh start Bonsai-JEV-weights
 ```
 
 ```bash
