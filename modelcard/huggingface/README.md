@@ -85,8 +85,8 @@ Order-agree is the share of pairs whose verdict survives swapping the two answer
 Build the [PrismML llama.cpp fork](https://github.com/PrismML-Eng/llama.cpp) from source with CUDA (or Metal). Stock llama.cpp cannot load these files; on AVX-512 CPUs (e.g. AMD Zen 4) use a source build, the release binaries crash on load.
 
 ```bash
-huggingface-cli download <user>/Bonsai-JEV-27B --local-dir Bonsai-JEV-27B
-git clone https://github.com/<user>/Bonsai-JEV && cd Bonsai-JEV
+huggingface-cli download dakebakery/Bonsai-JEV-27B --local-dir Bonsai-JEV-27B
+git clone https://github.com/DakePeng/Bonsai-JEV && cd Bonsai-JEV
 bash run_decide.sh start ../Bonsai-JEV-27B      # llama-server on :8080 + /v1/decide on :8000
 ```
 
@@ -144,7 +144,7 @@ The adapter is bound to this exact base file (Hadamard rotation metadata, value-
 
 LoRA r=16, α=32, dropout 0.05 on `in_proj_qkv, in_proj_z, out_proj, q/k/v/o_proj, gate/up/down_proj` of all 64 layers, applied to the raw (un-rotated) layer input exactly as the fork applies it; fp32 decision head 5120→24 initialised from the lm_head rows of the verbalizer tokens. Loss KL(target ‖ model) over active slots + 0.5·RPS for scores; 30% of choice rows shuffled. 128 rows/step stratified by kind, micro-batches ≤ 24k padded tokens, gradient checkpointing, AdamW (0.9, 0.98), LR 2e-4 head / 1e-4 LoRA, 3% warmup, cosine to 0.02×, 4,000 steps (JEV-27B's 5,000 steps minus its 21% placeholder rows). 518,603 training rows of [jev-distill-corpus-v3](https://huggingface.co/datasets/SargeDev/jev-distill-corpus-v3) (the 137,203 placeholder `yuri_v1` rows dropped). Base frozen in BF16, dequantised from the ternary file. 2× RTX PRO 6000 96 GB, ~24 h. Release checkpoint chosen by validation KL; per-kind temperatures fitted by L-BFGS on the `calibration` split.
 
-Code, alignment checks and the full log of decisions: [GitHub](https://github.com/<user>/Bonsai-JEV).
+Code, alignment checks and the full log of decisions: [GitHub](https://github.com/DakePeng/Bonsai-JEV).
 
 ## Limitations
 
@@ -162,4 +162,4 @@ Thanks to Prism ML, autotrust, SargeDev, the Qwen team and the maintainers of th
 
 ## Also on ModelScope
 
-[modelscope.cn/models/&lt;user&gt;/Bonsai-JEV-27B](https://modelscope.cn/models/<user>/Bonsai-JEV-27B), same files, faster from mainland China.
+[modelscope.cn/models/dakepeng/Bonsai-JEV-27B](https://modelscope.cn/models/dakepeng/Bonsai-JEV-27B), same files, faster from mainland China.

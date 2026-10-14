@@ -114,7 +114,7 @@ JEV-9B/27B/27B-VL 都是把完整底座权重和适配器、决策头、校准�
 | `Ternary-Bonsai-2-27B-PTQ1_0.gguf`（5.95 GB），适配器在它上面验证通过后再加 | 可选 |
 
 为什么打包底座而不是只给链接：适配器和这个 GGUF 文件是绑死的（v 头顺序、`prism.hadamard.*` 元数据、旋转版本）；Bonsai 的已知问题里已经记录过新旧文件不匹配会静默输出乱码。放一份验证过的副本就把版本锁住了。Apache 2.0 允许再分发，只要保留 Prism ML 的许可证和 NOTICE。
-- **Hugging Face** `<user>/Bonsai-JEV-27B` 和 **ModelScope** `<user>/Bonsai-JEV-27B`：文件相同。ModelScope 对国内用户很重要（我们的 4070 和 AutoDL 机器访问 Hugging Face 都很慢或连不上，所有下载都是 ModelScope 完成的）。用 `huggingface-cli upload` / `modelscope upload` 上传；ModelScope 的模型卡需要 YAML 头（license `apache-2.0`、tags、base_model）。
+- **Hugging Face** [`dakebakery/Bonsai-JEV-27B`](https://huggingface.co/dakebakery/Bonsai-JEV-27B) 和 **ModelScope** [`dakepeng/Bonsai-JEV-27B`](https://modelscope.cn/models/dakepeng/Bonsai-JEV-27B)：文件相同。ModelScope 对国内用户很重要（我们的 4070 和 AutoDL 机器访问 Hugging Face 都很慢或连不上，所有下载都是 ModelScope 完成的）。用 `huggingface-cli upload` / `modelscope upload` 上传；ModelScope 的模型卡需要 YAML 头（license `apache-2.0`、tags、base_model）。
 - **GitHub**：训练、导出、评测和服务的代码（就是本仓库），README 指向两个模型仓库。
 - `LICENSE`（Apache 2.0）和 `NOTICE`："Created using Bonsai by Prism ML"；基于 Qwen3.8-27B（阿里云，Apache 2.0）；JEV（autotrust，Apache 2.0）用作基线/教师；"trained on SargeDev/jev-distill-corpus-v3"并附作者要求的链接。
 

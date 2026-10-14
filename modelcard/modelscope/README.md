@@ -30,7 +30,7 @@ tags:
 
 > **状态（2026-10-14）：训练进行中。** 本卡片为草稿，标 *待测* 的在训练和评测完成后补上。
 
-[English model card on Hugging Face](https://huggingface.co/<user>/Bonsai-JEV-27B)
+[English model card on Hugging Face](https://huggingface.co/dakebakery/Bonsai-JEV-27B)
 
 ## 基于
 
@@ -86,8 +86,8 @@ tags:
 从源码编译 [PrismML 的 llama.cpp 分支](https://github.com/PrismML-Eng/llama.cpp)（CUDA 或 Metal）。原版 llama.cpp 加载不了这些文件；AVX-512 CPU（比如 AMD Zen 4）上一定要自己编译，发布的二进制一加载就崩。
 
 ```bash
-modelscope download --model <user>/Bonsai-JEV-27B --local_dir Bonsai-JEV-27B
-git clone https://github.com/<user>/Bonsai-JEV && cd Bonsai-JEV
+modelscope download --model dakepeng/Bonsai-JEV-27B --local_dir Bonsai-JEV-27B
+git clone https://github.com/DakePeng/Bonsai-JEV && cd Bonsai-JEV
 bash run_decide.sh start ../Bonsai-JEV-27B      # llama-server 在 :8080，/v1/decide 在 :8000
 ```
 
@@ -146,7 +146,7 @@ B) <选项 2>
 
 LoRA r=16、α=32、dropout 0.05，挂在全部 64 层的 `in_proj_qkv, in_proj_z, out_proj, q/k/v/o_proj, gate/up/down_proj` 上，作用于层的原始（未旋转）输入，和分支的做法完全一致；fp32 决策头 5120→24，用 verbalizer token 在 lm_head 中的行初始化。损失为有效槽位上的 KL(目标 ‖ 模型)，打分题加 0.5·RPS；30% 的选择题打乱选项。每步 128 行按类型分层，micro-batch ≤ 2.4 万填充 token，梯度检查点，AdamW (0.9, 0.98)，学习率决策头 2e-4 / LoRA 1e-4，3% 预热，余弦退火到 0.02 倍，4,000 步（JEV-27B 的 5,000 步扣掉其中 21% 的占位行）。训练数据为 [jev-distill-corpus-v3](https://modelscope.cn/datasets/SargeDev/jev-distill-corpus-v3) 的 518,603 行（去掉 137,203 行占位的 `yuri_v1`）。底座在 BF16 下冻结，从三值文件解包。2× RTX PRO 6000 96 GB，约 24 小时。发布的 checkpoint 按验证 KL 选；按类型温度在 `calibration` 划分上用 L-BFGS 拟合。
 
-代码、对齐检查和完整的决策记录：[GitHub](https://github.com/<user>/Bonsai-JEV)。
+代码、对齐检查和完整的决策记录：[GitHub](https://github.com/DakePeng/Bonsai-JEV)。
 
 ## 局限
 
