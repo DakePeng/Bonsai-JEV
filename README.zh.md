@@ -126,7 +126,7 @@ python export_gguf_lora.py --ckpt ckpt/run1/best --out ckpt/run1/best/adapter.gg
 
 ### 配方（按 JEV-27B 模型卡对齐）
 
-LoRA r=16、α=32、dropout 0.05，挂在全部 64 层的 `in_proj_qkv, in_proj_z, out_proj, q/k/v/o_proj, gate/up/down_proj` 上（1.088 亿参数）。fp32 决策头 5120→24，用 verbalizer token（`false/true`、`0`–`5`、`A`–`P`）在 lm_head 里的行初始化。损失：该类型有效槽位上的 KL(目标 ‖ 模型)，打分题再加 0.5·RPS；30% 的选择题打乱选项顺序。每步 128 行按类型分层，按长度分桶，micro-batch ≤ 2.4 万个填充 token，开梯度检查点。AdamW (0.9, 0.98)，学习率决策头 2e-4 / LoRA 1e-4，3% 预热，余弦退火到 0.02 倍，梯度裁剪 1.0。4,000 步 ≈ JEV-27B 的 5,000 步扣掉它 21% 的占位行（我们直接丢掉 137,203 行 `yuri_v1` 占位数据，而不是给 0.05 权重）。发布的 checkpoint 按验证 KL 选。
+LoRA r=16、α=32、dropout 0.05，挂在全部 64 层的 `in_proj_qkv, in_proj_z, out_proj, q/k/v/o_proj, gate/up/down_proj` 上（1.088 亿参数）。fp32 决策头 5120→24，用 verbalizer token（`false/true`、`0`–`5`、`A`–`P`）在 lm_head 里的行初始化。损失：该类型有效槽位上的 KL(目标 ‖ 模型)，打分题再加 0.5·RPS；30% 的选择题打乱选项顺序。每步 128 行按类型分层，按长度分桶，micro-batch ≤ 2.4 万个填充 token，开梯度检查点。AdamW (0.9, 0.98)，学习率决策头 2e-4 / LoRA 1e-4，3% 预热，余弦退火到 0.02 倍，梯度裁剪 1.0。4,000 步 ≈ JEV-27B 的 5,000 步扣掉它 21% 的占位行（我们直接丢掉 137,203 行 `yuri_v1` 占位数据，而不是给 0.05 权重）。丢掉它们没有可测的代价：noul KL 0.0041，JEV-27B 是 0.004；拟合出的 noul 温度两边都是 1.014。发布的 checkpoint 按验证 KL 选。
 
 ### 难点（本仓库已解决）
 
