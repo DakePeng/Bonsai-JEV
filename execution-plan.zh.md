@@ -101,9 +101,21 @@
 
 **许可证：Apache 2.0**，覆盖我们产出的全部（LoRA、决策头、`decision.json`、校准文件、代码、GGUF 打包）。整条链都是 Apache 2.0（Bonsai、Qwen3.8、JEV 适配器、语料），Apache 带专利授权，打包里一个许可证省去逐文件标注。MIT 用在我们自己的文件上也可以，但打包 GGUF 时要双重声明。
 
-**发布内容**
-- 给分支用的 `adapter.gguf`（LoRA + 作为 lm_head LoRA 的决策头，第 15 步）+ `decision.json` + `calibration.json`；给 PyTorch 用的 peft 适配器 + `head.safetensors`；服务封装（`decide_server.py`、`run_decide.sh`）；评测脚本和零样本/训练后的数字。
-- 不重新托管底座权重，除非发布合并后的 GGUF；那时 Prism ML 的 NOTICE 随包附带。
+**发布内容（2026-10-14 定）：按 JEV 的方式做一个"全家桶"模型仓库，Hugging Face 和 ModelScope 同步发布。**
+JEV-9B/27B/27B-VL 都是把完整底座权重和适配器、决策头、校准、服务脚本放在同一个仓库（"一个仓库、一条命令"；JEV-27B 约 54 GB，JEV-27B-VL 约 56 GB）。我们也这样：
+
+| 文件 | 大小 |
+|---|---:|
+| `Ternary-Bonsai-2-27B-PQ2_0.gguf`（Prism ML 的原文件，逐字节一致，就是我们验证过的那份） | 7.2 GB |
+| `Ternary-Bonsai-2-27B-mmproj-Q8_0.gguf` | 0.6 GB |
+| `adapter.gguf`（LoRA + 作为 lm_head LoRA 的决策头，第 15 步）+ `decision.json` + `calibration.json` | 0.46 GB |
+| `peft/`（adapter_model.safetensors + 配置）+ `head.safetensors`，给 PyTorch 和继续训练用 | 0.44 GB |
+| `decide_server.py`、`run_decide.sh`、模型卡 README、`LICENSE`、`NOTICE`（含 Prism ML 的 NOTICE） | 很小 |
+| `Ternary-Bonsai-2-27B-PTQ1_0.gguf`（5.95 GB），适配器在它上面验证通过后再加 | 可选 |
+
+为什么打包底座而不是只给链接：适配器和这个 GGUF 文件是绑死的（v 头顺序、`prism.hadamard.*` 元数据、旋转版本）；Bonsai 的已知问题里已经记录过新旧文件不匹配会静默输出乱码。放一份验证过的副本就把版本锁住了。Apache 2.0 允许再分发，只要保留 Prism ML 的许可证和 NOTICE。
+- **Hugging Face** `<user>/Bonsai-JEV-27B` 和 **ModelScope** `<user>/Bonsai-JEV-27B`：文件相同。ModelScope 对国内用户很重要（我们的 4070 和 AutoDL 机器访问 Hugging Face 都很慢或连不上，所有下载都是 ModelScope 完成的）。用 `huggingface-cli upload` / `modelscope upload` 上传；ModelScope 的模型卡需要 YAML 头（license `apache-2.0`、tags、base_model）。
+- **GitHub**：训练、导出、评测和服务的代码（就是本仓库），README 指向两个模型仓库。
 - `LICENSE`（Apache 2.0）和 `NOTICE`："Created using Bonsai by Prism ML"；基于 Qwen3.8-27B（阿里云，Apache 2.0）；JEV（autotrust，Apache 2.0）用作基线/教师；"trained on SargeDev/jev-distill-corpus-v3"并附作者要求的链接。
 
 **哪个 checkpoint 可以发布**

@@ -73,13 +73,14 @@ Max context on 12 GB: ~24–32k tokens with f16 KV, ~48–60k with q8_0 KV (only
 
 Requires the [PrismML llama.cpp fork](https://github.com/PrismML-Eng/llama.cpp) built from source with CUDA (stock llama.cpp cannot load PQ2_0; on AVX-512 CPUs such as Zen 4 the release binaries crash on load, see the model's KNOWN_ISSUES).
 
+Everything needed to serve (base GGUF, vision projector, adapter, calibration) is in one model repo, mirrored on Hugging Face and ModelScope (links *TBD* at release). The base is Prism ML's file, byte-identical to the one the adapter was validated against.
+
 ```bash
-# 1. base model (≈ 8 GB): from Hugging Face or ModelScope
-modelscope download --model prism-ml/Ternary-Bonsai-2-27B-gguf \
-  --include "Ternary-Bonsai-2-27B-PQ2_0.gguf" "Ternary-Bonsai-2-27B-mmproj-Q8_0.gguf" --local_dir ~/bonsai/models/bonsai2-27b
-# 2. adapter: adapter.gguf + decision.json (link TBD) into ~/bonsai/adapter
-# 3. start llama-server + the /v1/decide wrapper
-bash run_decide.sh start ~/bonsai/adapter
+# ≈ 8.7 GB. Either source:
+huggingface-cli download <user>/Bonsai-JEV-27B --local-dir ~/bonsai/Bonsai-JEV-27B
+modelscope download --model <user>/Bonsai-JEV-27B --local_dir ~/bonsai/Bonsai-JEV-27B     # faster from mainland China
+# start llama-server + the /v1/decide wrapper
+bash run_decide.sh start ~/bonsai/Bonsai-JEV-27B
 ```
 
 ```bash

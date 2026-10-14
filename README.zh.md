@@ -73,13 +73,14 @@ KL(目标 ‖ 模型)，越低越好，按类型温度校准后。"Jev 标注的
 
 需要从源码带 CUDA 编译 [PrismML 的 llama.cpp 分支](https://github.com/PrismML-Eng/llama.cpp)（原版 llama.cpp 加载不了 PQ2_0；在 Zen 4 等 AVX-512 CPU 上，发布的二进制一加载就崩，见模型的 KNOWN_ISSUES）。
 
+推理所需的全部文件（底座 GGUF、视觉投影、适配器、校准）都在同一个模型仓库里，Hugging Face 和 ModelScope 同步发布（链接发布时补上）。底座就是 Prism ML 的原文件，和适配器验证时用的那份逐字节一致。
+
 ```bash
-# 1. 底座（约 8 GB），Hugging Face 或 ModelScope
-modelscope download --model prism-ml/Ternary-Bonsai-2-27B-gguf \
-  --include "Ternary-Bonsai-2-27B-PQ2_0.gguf" "Ternary-Bonsai-2-27B-mmproj-Q8_0.gguf" --local_dir ~/bonsai/models/bonsai2-27b
-# 2. 适配器：adapter.gguf + decision.json（链接待补）放到 ~/bonsai/adapter
-# 3. 启动 llama-server 和 /v1/decide 封装
-bash run_decide.sh start ~/bonsai/adapter
+# 约 8.7 GB，两个来源任选：
+modelscope download --model <user>/Bonsai-JEV-27B --local_dir ~/bonsai/Bonsai-JEV-27B     # 国内推荐
+huggingface-cli download <user>/Bonsai-JEV-27B --local-dir ~/bonsai/Bonsai-JEV-27B
+# 启动 llama-server 和 /v1/decide 封装
+bash run_decide.sh start ~/bonsai/Bonsai-JEV-27B
 ```
 
 ```bash

@@ -101,9 +101,21 @@ Rule: training data for the shipped model must be Apache/MIT/CC0/own; NC and res
 
 **License: Apache 2.0** for everything we produce (LoRA, decision head, `decision.json`, calibration, code, GGUF bundles). The whole stack is Apache 2.0 (Bonsai, Qwen3.8, JEV adapters, corpus), Apache carries a patent grant, and one license across the bundle avoids per-file notices. MIT would also be allowed for our own files but would need dual notices in the packaged GGUF.
 
-**What gets released**
-- `adapter.gguf` (LoRA + head as lm_head LoRA, step 15) + `decision.json` + `calibration.json` for the fork; the peft adapter + `head.safetensors` for PyTorch; the serving wrapper (`decide_server.py`, `run_decide.sh`); the eval scripts and the zero-shot/trained numbers.
-- No base weights re-hosted unless packaging a merged GGUF; then Prism ML's NOTICE travels with it.
+**What gets released (decided 2026-10-14): JEV-style all-in-one model repo, mirrored on Hugging Face and ModelScope.**
+JEV-9B/27B/27B-VL each ship the full base weights next to the adapter, head, calibration and serve scripts ("one repo, one command"; JEV-27B ≈ 54 GB, JEV-27B-VL ≈ 56 GB). We do the same:
+
+| File | Size |
+|---|---:|
+| `Ternary-Bonsai-2-27B-PQ2_0.gguf` (Prism ML's file, byte-identical, the exact one we validated against) | 7.2 GB |
+| `Ternary-Bonsai-2-27B-mmproj-Q8_0.gguf` | 0.6 GB |
+| `adapter.gguf` (LoRA + head as lm_head LoRA, step 15) + `decision.json` + `calibration.json` | 0.46 GB |
+| `peft/` (adapter_model.safetensors + config) + `head.safetensors`, for PyTorch / further training | 0.44 GB |
+| `decide_server.py`, `run_decide.sh`, model card README, `LICENSE`, `NOTICE` (incl. Prism ML's NOTICE) | small |
+| `Ternary-Bonsai-2-27B-PTQ1_0.gguf` (5.95 GB), only after the adapter is verified on it | optional |
+
+Why bundle the base instead of linking it: the adapter is bound to this exact GGUF (v-head order, `prism.hadamard.*` metadata, rotation version); Bonsai's KNOWN_ISSUES already records an older/newer file silently producing garbage. Shipping the validated copy pins it. Redistribution is allowed under Apache 2.0 with Prism ML's license and NOTICE kept.
+- **Hugging Face** `<user>/Bonsai-JEV-27B` and **ModelScope** `<user>/Bonsai-JEV-27B`: same files. ModelScope matters for users in China (Hugging Face was slow or unreachable from our 4070 and the AutoDL box; ModelScope served everything we downloaded). Upload with `huggingface-cli upload` / `modelscope upload`; ModelScope needs a model card with YAML front matter (license `apache-2.0`, tags, base_model).
+- **GitHub**: training, export, evaluation and serving code (this repository), README pointing to both model repos.
 - `LICENSE` (Apache 2.0) and `NOTICE`: "Created using Bonsai by Prism ML"; built on Qwen3.8-27B (Alibaba Cloud, Apache 2.0); JEV (autotrust, Apache 2.0) used as baseline/teacher; "trained on SargeDev/jev-distill-corpus-v3" with the link the author asks for.
 
 **Which checkpoint may be released**
