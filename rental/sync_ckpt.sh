@@ -8,7 +8,12 @@ RUN=${RUN:-run1}
 step_of() { python3 -c "import json,sys;print(json.load(open(sys.argv[1]))['step'])" "$1" 2>/dev/null; }
 while true; do
   for tag in best last; do
-    remote=$(ssh -o ConnectTimeout=30 autodl "cat /root/Bonsai-JEV/ckpt/$RUN/$tag/head.json 2>/dev/null" | python3 -c "import json,sys;print(json.load(sys.stdin)['step'])" 2>/dev/null)
+    remote=""
+    for try in 1 2 3; do   # the AutoDL gateway / local proxy drops a connection now and then
+      remote=$(ssh -o ConnectTimeout=30 autodl "cat /root/Bonsai-JEV/ckpt/$RUN/$tag/head.json 2>/dev/null" 2>/dev/null | python3 -c "import json,sys;print(json.load(sys.stdin)['step'])" 2>/dev/null)
+      [ -n "$remote" ] && break; sleep 20
+    done
+    [ -z "$remote" ] && echo "$(date '+%m-%d %H:%M') $tag: rental box unreachable this round"
     local_=$(step_of "ckpt/$RUN/$tag/head.json")
     [ -z "$remote" ] || [ "$remote" = "$local_" ] && continue
     rm -rf "ckpt/$RUN/$tag.new"; mkdir -p "ckpt/$RUN/$tag.new"
