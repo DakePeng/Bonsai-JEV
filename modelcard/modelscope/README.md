@@ -1,0 +1,163 @@
+---
+license: apache-2.0
+library_name: llama.cpp
+pipeline_tag: text-classification
+base_model:
+- prism-ml/Ternary-Bonsai-2-27B-gguf
+datasets:
+- SargeDev/jev-distill-corpus-v3
+language:
+- en
+tags:
+- system-one
+- decision
+- calibrated-probabilities
+- jev
+- bonsai
+- ternary
+- gguf
+- llama-cpp
+- lora
+- vision
+- on-device
+---
+
+# Bonsai-JEV-27B
+
+**约 9 GB 就能跑、能看图、输出校准概率的 27B 决策模型。** 把 [JEV](https://modelscope.cn/models/autotrust/JEV-27B) 的配方（LoRA + 24 位决策头，用软标签蒸馏）训练在 [Ternary Bonsai 2 27B](https://modelscope.cn/models/prism-ml/Ternary-Bonsai-2-27B-gguf) 上。后者是 Prism ML 把 Qwen3.8-27B 压缩成三值的版本。对一个有类型的问题（是/否、0–5 打分、2–16 选 1）提问，状态里可以带图，一次前向就输出各选项的校准概率，不生成文字。
+
+同一套权重也提供 **System 2**：把适配器关掉，服务就是 Ternary Bonsai 2 本身，逐字节一致。
+
+> **状态（2026-10-14）：训练进行中。** 本卡片为草稿，标 *待测* 的在训练和评测完成后补上。
+
+[English model card on Hugging Face](https://huggingface.co/<user>/Bonsai-JEV-27B)
+
+## 基于
+
+- **[Ternary Bonsai 2 27B](https://modelscope.cn/models/prism-ml/Ternary-Bonsai-2-27B-gguf)，作者 Prism ML**（Apache 2.0）。*Created using Bonsai by Prism ML.* 它的三值权重是冻结底座，原样不动，本仓库附带一份逐字节一致的副本；它的 [llama.cpp 分支](https://github.com/PrismML-Eng/llama.cpp)是运行时。Bonsai 2 基于阿里云的 Qwen3.8-27B（Apache 2.0）。
+- **[JEV-9B](https://huggingface.co/autotrust/JEV-9B) 和 [JEV-27B](https://huggingface.co/autotrust/JEV-27B)，作者 autotrust**（Apache 2.0）。训练配方、提示词模板、verbalizer、"把决策头表示成 lm_head 上的 LoRA"的部署方式和 `/v1/decide` 接口都来自它们；它们公开的数字是我们的目标。
+
+## 一览
+
+| | JEV-27B / JEV-27B-VL | **Bonsai-JEV-27B** |
+|---|---|---|
+| 底座 | Qwen3.8-27B，BF16 | Ternary Bonsai 2 27B，PQ2_0（2.13 bit/权重） |
+| 下载大小 | 约 54 / 56 GB | **约 8.7 GB** |
+| 能跑在 | 一张 80 GB 以上的卡（vLLM） | 12 GB 显卡（RTX 4070 已测）；Jetson Orin NX 16 GB 和 Apple Silicon 走分支的后端（尚未带适配器测试） |
+| 训练参数 | 1.088 亿 LoRA + 12.3 万决策头 | 同一配方、同样的形状 |
+| 看图 | 零样本 | 零样本 |
+| System 2 | 未改动的 Qwen3.8-27B | 未改动的 Ternary Bonsai 2 27B |
+
+## 结果
+
+**文本决策**，[jev-distill-corpus-v3](https://modelscope.cn/datasets/SargeDev/jev-distill-corpus-v3) 的 `test_set_30k`，按类型温度校准后的 KL(目标 ‖ 模型)，越低越好。"Jev 标注"指由 TypeSafe Jev 1.13 打标签的 25,376 行。
+
+| 模型 | Jev 标注 | noul | score | choice |
+|---|---:|---:|---:|---:|
+| Ternary Bonsai 2 27B 零样本（读字母 logits） | 0.443 | 0.167 | 0.724 | 0.595 |
+| JEV-9B（公开） | 0.019 | 0.005 | 0.023 | 0.028 |
+| JEV-27B（公开） | 0.017 | | | |
+| **Bonsai-JEV-27B** | *待测* | *待测* | *待测* | *待测* |
+
+训练中的验证 KL（1,024 行，未做温度校准）：第 250 步 0.070，第 1,000 步 0.035，第 2,000 步 0.025，**第 3,250 步 0.019**（noul 0.004、score 0.021、choice 0.033）；最终结果 *待测*。
+
+**看图决策**，[VL-RewardBench](https://huggingface.co/datasets/MMInstruction/VL-RewardBench)（1,247 对，两种顺序取平均，与 JEV demo 协议相同）：
+
+| 模型 | 总分 | hallucination | reasoning | general | 顺序一致率 |
+|---|---:|---:|---:|---:|---:|
+| Ternary Bonsai 2 27B 零样本 | 74.5 | 78.9 | 72.2 | 60.2 | 50.9% |
+| JEV-27B-VL（公开） | 78.3 | 83.2 | 78.2 | 58.0 | 89% |
+| **Bonsai-JEV-27B** | *待测* | *待测* | *待测* | *待测* | *待测* |
+
+顺序一致率是把两个回答换位后结论不变的比例，反映单次前向的结果是否可信。
+
+**速度和显存**，RTX 4070 12 GB，PrismML 的 llama.cpp 分支：
+
+| | |
+|---|---|
+| 处理输入 / 生成 | 1,226 / 49.6 token/秒 |
+| 峰值显存（模型 + 视觉 + 4k 上下文） | 9.17 GB |
+| 文本决策，100–300 token | 零样本 0.1–0.35 秒；挂适配器 *待测* |
+| 一张 640×480 图的决策，冷启动 / 场景预热后追问 | 0.5–0.9 秒 / 约 0.2 秒 |
+| 12 GB 上的最大上下文 | 约 2.4–3.2 万 token（f16 KV），约 4.8–6 万（q8_0 KV） |
+
+## 快速上手
+
+从源码编译 [PrismML 的 llama.cpp 分支](https://github.com/PrismML-Eng/llama.cpp)（CUDA 或 Metal）。原版 llama.cpp 加载不了这些文件；AVX-512 CPU（比如 AMD Zen 4）上一定要自己编译，发布的二进制一加载就崩。
+
+```bash
+modelscope download --model <user>/Bonsai-JEV-27B --local_dir Bonsai-JEV-27B
+git clone https://github.com/<user>/Bonsai-JEV && cd Bonsai-JEV
+bash run_decide.sh start ../Bonsai-JEV-27B      # llama-server 在 :8080，/v1/decide 在 :8000
+```
+
+### System 1：类型化决策
+
+```bash
+curl -s localhost:8000/v1/decide -H 'content-type: application/json' -d '{
+  "kind": "choice",
+  "state": ["摄像头画面：", {"image": "frame.jpg"}, "\n夹爪张开，位于桌面上方。"],
+  "question": "Which object should the arm pick first?",
+  "options": ["red cube", "blue cube", "nothing, the scene is unsafe"]}'
+# {"kind":"choice","options":[...],"probabilities":[0.71,0.22,0.07],"choice_index":0,"choice":"red cube",...}
+```
+
+- `kind`：`noul`（选项 `false`/`true`）、`score`（`0`–`5`）、`choice`（2–16 个选项，标为 A–P）。
+- `state`：字符串、JSON 对象，或文本和 `{"image": 路径 | URL | data-URL}` 混合的列表。
+- 返回格式和 JEV 的 `serve_decide.py` 一致，JEV 的 [`jev_client.py`](https://github.com/yuhai-china/JEV-27B-DEMO/blob/main/common/jev_client.py) 设置 `JEV_URL=http://localhost:8000 JEV_BACKEND=decide` 即可直接用。
+- 同一个场景问多个问题：先 `POST /v1/warm {"state": ..., "kinds": ["noul"]}` 一次，之后每次 `/v1/decide` 只计算问题本身的 token（4070 上约 0.2 秒）。模型有循环层，前缀复用需要这个显式边界，每种 `kind` 预热一次。
+
+### System 2：聊天和推理
+
+直接向 8080 端口的 `llama-server` 发普通的 OpenAI 格式请求。`run_decide.sh` 加载适配器时把全局 scale 设为 0，所以这些请求看到的是未改动的 Ternary Bonsai 2：适配器关闭时，12 个测试回答和不加载适配器的服务逐字节一致。聊天时不要把适配器的 scale 设成 1，打开后回答会变。
+
+### 提示词格式
+
+封装层会渲染 JEV 的 `bare-v1` 模板，你只需传字段：
+
+```
+[kind] choice
+[state] <状态，图片内嵌>
+[question] <问题>
+[options]
+A) <选项 1>
+B) <选项 2>
+[decision]:
+```
+
+概率从 `[decision]:` 位置的 verbalizer token（`false/true`、`0`–`5`、`A`–`P`）读出，再加上 `decision.json` 里的决策头偏置和按类型温度。场景放前、问题放后，预热的前缀才能复用。
+
+## 文件
+
+| 文件 | 大小 | 内容 |
+|---|---:|---|
+| `Ternary-Bonsai-2-27B-PQ2_0.gguf` | 7.2 GB | Prism ML 的底座，和验证时用的文件逐字节一致 |
+| `Ternary-Bonsai-2-27B-mmproj-Q8_0.gguf` | 0.6 GB | 视觉投影 |
+| `adapter.gguf` | 0.46 GB | 64 层上的 LoRA + 作为 `output.weight` 上 rank-24 LoRA 的决策头 |
+| `decision.json` | — | 决策头偏置、verbalizer id、槽位范围、按类型温度 |
+| `peft/`、`head.safetensors` | 0.44 GB | 同一个适配器的 PyTorch 版本，可继续训练 |
+| `decide_server.py`、`run_decide.sh` | — | 套在 `llama-server` 上的 `/v1/decide` 和 `/v1/warm` |
+| `configuration.json` | — | ModelScope 仓库配置 |
+| `LICENSE`、`NOTICE` | — | Apache 2.0；署名，含 Prism ML 的 NOTICE |
+
+适配器和这个底座文件是绑定的（Hadamard 旋转元数据、value 头排布）。请使用仓库附带的 GGUF，不要换成更新或更旧的 Bonsai 2 文件。
+
+## 训练
+
+LoRA r=16、α=32、dropout 0.05，挂在全部 64 层的 `in_proj_qkv, in_proj_z, out_proj, q/k/v/o_proj, gate/up/down_proj` 上，作用于层的原始（未旋转）输入，和分支的做法完全一致；fp32 决策头 5120→24，用 verbalizer token 在 lm_head 中的行初始化。损失为有效槽位上的 KL(目标 ‖ 模型)，打分题加 0.5·RPS；30% 的选择题打乱选项。每步 128 行按类型分层，micro-batch ≤ 2.4 万填充 token，梯度检查点，AdamW (0.9, 0.98)，学习率决策头 2e-4 / LoRA 1e-4，3% 预热，余弦退火到 0.02 倍，4,000 步（JEV-27B 的 5,000 步扣掉其中 21% 的占位行）。训练数据为 [jev-distill-corpus-v3](https://modelscope.cn/datasets/SargeDev/jev-distill-corpus-v3) 的 518,603 行（去掉 137,203 行占位的 `yuri_v1`）。底座在 BF16 下冻结，从三值文件解包。2× RTX PRO 6000 96 GB，约 24 小时。发布的 checkpoint 按验证 KL 选；按类型温度在 `calibration` 划分上用 L-BFGS 拟合。
+
+代码、对齐检查和完整的决策记录：[GitHub](https://github.com/<user>/Bonsai-JEV)。
+
+## 局限
+
+- **质量天花板是 JEV 水平。** 三值底座只能挂 LoRA。Qwen3.8-27B 的全量微调模型在 [Jev Decision Index](https://huggingface.co/spaces/multimodalart/jev-decision-index) 上分数更高；这个模型的意义在内存，不在超过它们。
+- **和 JEV 同一个教师**，文本上只能逼近 JEV-27B，不能超过。`choice` 最难。
+- **三值化对视觉的伤害大于文本**（Bonsai 的模型卡：MMMU-Pro 81.7 → 75.5）。看图决策和 JEV-27B-VL 一样是零样本。
+- **英文提示词。** 训练数据是英文；其他语言（包括中文）的决策质量未测。
+- **延迟：** 每次决策是一次 27B 的前向；Jetson Orin NX 上一次看图决策预计几秒。
+
+## 许可证和致谢
+
+适配器、决策头和脚本为 Apache 2.0。*Created using Bonsai by Prism ML*；Ternary Bonsai 2 27B © Prism ML, Inc.，Apache 2.0，基于 Qwen3.8-27B（© 阿里云，Apache 2.0），本仓库原样再分发并附带其许可证和 NOTICE。配方和部署设计来自 autotrust 的 JEV-9B / JEV-27B（Apache 2.0）。训练数据为 [SargeDev/jev-distill-corpus-v3](https://modelscope.cn/datasets/SargeDev/jev-distill-corpus-v3)（Apache 2.0；`openjev_v2` 为 CC0），与 JEV-9B 和 JEV-27B 使用的语料相同；其中 `yuri_v3` 的标签是 TypeSafe 的 Jev 1.13 的输出，商用者可自行查看 TypeSafe 的 API 条款。VL-RewardBench 仅用于评测。
+
+感谢 Prism ML、autotrust、SargeDev、Qwen 团队和 Jev Decision Index 的维护者。
