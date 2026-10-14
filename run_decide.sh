@@ -13,7 +13,12 @@ LPORT=${LPORT:-8080}
 PORT=${PORT:-8000}
 mkdir -p results
 
-stop() { pkill -f "[l]lama-server .*--port $LPORT"; pkill -f "[u]vicorn decide_server"; sleep 1; echo "stopped"; }
+stop() {
+  pkill -f "[l]lama-server .*--port $LPORT"; pkill -f "[u]vicorn decide_server"
+  # wait until both ports are free, else the next start fails to bind (llama-server takes seconds to release VRAM)
+  for i in $(seq 60); do pgrep -f "[l]lama-server .*--port $LPORT|[u]vicorn decide_server" > /dev/null || break; sleep 1; done
+  pkill -9 -f "[l]lama-server .*--port $LPORT"; pkill -9 -f "[u]vicorn decide_server"; sleep 1; echo "stopped"
+}
 
 case "${1:-start}" in
   stop) stop; exit 0 ;;
