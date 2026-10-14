@@ -18,7 +18,7 @@ case "${1:-start}" in
     stop > /dev/null
     ADAPTER=${2:-}
     LORA=""; DJ=""
-    if [ -n "$ADAPTER" ]; then LORA="--lora $ADAPTER/adapter.gguf"; DJ="$ADAPTER/decision.json"; fi
+    if [ -n "$ADAPTER" ]; then LORA="--lora $ADAPTER/adapter.gguf --lora-init-without-apply"; DJ="$ADAPTER/decision.json"; fi
     # -np 2: two slots; the server routes a request to the slot with the longest common prefix.
     # --cache-ram / --cache-reuse: keep evicted prompts in RAM and reuse partial prefixes (KNOWN_ISSUES.md).
     setsid nohup $BIN/llama-server -m $M/Ternary-Bonsai-2-27B-PQ2_0.gguf --mmproj $M/Ternary-Bonsai-2-27B-mmproj-Q8_0.gguf \

@@ -45,6 +45,10 @@ MODEL_NAME = os.environ.get("DECIDE_MODEL_NAME", "bonsai2-27b-decision")
 _dj = os.environ.get("DECISION_JSON")
 DEC = json.load(open(_dj)) if _dj else {}
 BIAS = DEC.get("head_bias", [0.0] * 24)
+# The server starts with --lora-init-without-apply, so the adapter is OFF by default (any chat / System 2 request
+# sees the untouched base). Decision and warm-up calls switch it on explicitly. Same scale on both, so warm-up
+# prefixes stay reusable (llama-server only reuses cache across requests with identical LoRA sets).
+LORA_ON = {"lora": [{"id": 0, "scale": 1.0}]} if DEC else {}
 TEMPS = DEC.get("per_kind_temperature", {})
 app = FastAPI()
 
@@ -98,7 +102,7 @@ def warm(req: WarmRequest):
         prompt, images = render(kind, req.state, "", ["x"])
         prefix = prompt.split("\n[question]")[0]          # "[kind] k\n[state] <state>"
         body = {"prompt": {"prompt_string": prefix, "multimodal_data": images} if images else prefix,
-                "n_predict": 1, "n_probs": 0, "cache_prompt": True}
+                "n_predict": 1, "n_probs": 0, "cache_prompt": True, **LORA_ON}
         r = _http.post(f"{LLAMA_URL}/completion", json=body, timeout=600)
         if not r.ok:
             raise HTTPException(502, f"llama-server: {r.status_code} {r.text[:300]}")
@@ -127,7 +131,7 @@ def decide(req: DecideRequest):
     prompt, images = render(kind, req.state, req.question, options)
     body = {
         "prompt": {"prompt_string": prompt, "multimodal_data": images} if images else prompt,
-        "n_predict": 1, "n_probs": 1000, "post_sampling_probs": False, "cache_prompt": True,
+        "n_predict": 1, "n_probs": 1000, "post_sampling_probs": False, "cache_prompt": True, **LORA_ON,
         "temperature": 1.0, "top_k": 0, "top_p": 1.0, "min_p": 0.0, "samplers": [],
     }
     r = _http.post(f"{LLAMA_URL}/completion", json=body, timeout=600)
