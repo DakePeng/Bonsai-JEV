@@ -293,7 +293,8 @@ Needed before any "Pareto frontier" claim: the text-only result (Jev-corpus KL =
 1. Add a `/v1/systemone` route to `decide_server.py` (TypeSafe request shape, same translation as `jevbench_eval.py`) for the kit's `http` engine; check whether the vision kit's `decide` engine speaks our `/v1/decide`.
 2. Rebuild the suites on the 4070 (vision ~5.7 GB; text ~7 GB, needs the HLE terms accepted on the user's HF account).
 3. Validate both pipelines on `suite sample --n 100`, then run the full public suites in the background: vision 12,210 rows (~10 h), text ~140k requests (~10–20 h).
-4. Then decide the wording: frontier claim only if the vision score clears d3-mini (63.2) at ~9 GB; submit to the board (the board's latency rule is measured on one RTX PRO 6000; our 4070 numbers are an upper bound).
+4. Then decide the wording: frontier claim only if the vision score clears d3-mini at ~9 GB; submit to the board (the board's latency rule is measured on one RTX PRO 6000; our 4070 numbers are an upper bound).
+   **Compare public with public (checked 2026-10-15).** We can only run the public suites; the board's Full score adds private tests (vision 50%, text 80%). Board 0.3.2 (2026-10-14) public columns: vision JEV-27B-VL 72.80, d3 27B 74.08, d3-mini 67.67; text JEV-27B 53.64 (Full 55.64, now rank 37), d3-mini 54.90. The JEV-35B card follows the same convention (its own kit run, public only: text 59.73 vs JEV-27B-VL 53.64; vision "rebuild" 71.94 vs JEV-27B-VL 71.67, about 1 point under the board's public 72.80, so a self-built vision suite reads ~1 point low). The JEV-27B-VL card's "#1 on the vision board, 69.82" is the 2026-10-07 snapshot; on 0.3.2 it is #3 at 69.60. Frontier bar therefore: vision public > d3-mini's 67.67 (~1 point margin for the rebuild), text public reported next to JEV-27B's 53.64.
 Release does not wait for this; README/model cards get the DI numbers when they land.
 
 ### Run 1 result (2026-10-14)

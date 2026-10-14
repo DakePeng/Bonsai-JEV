@@ -22,40 +22,60 @@ Bonsai-JEV is the JEV recipe applied to the Bonsai 2 base; credit for both ideas
 
 Also thanks to **[bonjev](https://github.com/ChezRD/bonjev) by ChezRD** (MIT), an earlier, training-free route to decisions on Ternary Bonsai: a Rust engine over the Prism llama.cpp libraries that combines existing decision-LoRA deltas. Its published [JevBench-231](https://github.com/fstandhartinger/jevbench) and Decision Index protocol and numbers are the external comparison we report against (`jevbench_eval.py` grades exactly like its exam).
 
-> **Status (2026-10-14): training in progress.** Validation KL is below; test-set numbers, the released adapter and the image benchmarks will be filled in when the run finishes. Entries marked *TBD* are not measured yet.
+> **Status (2026-10-15): trained and evaluated through the deployment path** (fork + `adapter.gguf` on the ternary base). JevBench-231, the agent-judge benchmarks and the Decision Index run are still pending (*TBD*).
 
 ## Results
 
 ### Text decisions (`test_set_30k` of [jev-distill-corpus-v3](https://huggingface.co/datasets/SargeDev/jev-distill-corpus-v3))
 
-KL(target ‖ model), lower is better, after per-kind temperature. "Jev-labelled" = the 25,376 `yuri_v3` rows, the fairest comparison with the JEV model cards.
+KL(target ‖ model), lower is better, after per-kind temperature. "Jev-labelled" = the 25,376 `yuri_v3` rows, the fairest comparison with the JEV model cards. Bonsai-JEV numbers are measured through the deployment path: the PrismML fork running `adapter.gguf` on the ternary PQ2_0 file.
 
 | Model | Jev-labelled rows | All rows* | noul | score | choice |
 |---|---:|---:|---:|---:|---:|
 | Bonsai 2 27B zero-shot (no adapter, letter logits) | 0.443 | 0.481 | 0.167 | 0.724 | 0.595 |
 | JEV-9B (published) | 0.019 | 0.021 | 0.005 | 0.023 | 0.028 |
-| JEV-27B (published) | 0.017 | 0.019 | | | |
-| **Bonsai-JEV** (step 3,750) | **0.0165** | 0.020 | 0.004 | 0.021 | 0.025 |
+| JEV-27B (published) | 0.017 | 0.019 | 0.004 | 0.021 | 0.025 |
+| **Bonsai-JEV** (step 4,000, released) | **0.0163** | 0.0202 | 0.0041 | 0.0205 | 0.0245 |
 
 \* Our "all" excludes the 2,260 `yuri_v1` rows whose labels are placeholder `[0.5, 0.5]`; JEV's includes them.
+
+The other metrics of the JEV-27B card, same rows and definitions (`kl_breakdown.py`):
+
+| | JEV-27B (published) | **Bonsai-JEV** |
+|---|---:|---:|
+| Yes/no AUROC (`noul`), Jev-labelled / all rows | 0.995 / 0.996 | **0.995 / 0.996** |
+| Choice top-1 agreement with Jev, Jev-labelled | 90.5% | **91.1%** |
+| Choice top-1, rows whose target's top two differ by ≥ 0.1 | 95.8% | **96.2%** |
+| Rating error (`score`, MAE of the expected rating, 0–5) | 0.098 | **0.097** |
+| ECE, 15 bins, after temperature | 0.0009 | 0.0006 † |
+| Fitted temperatures noul / score / choice | 1.014 / 1.004 / 1.016 | 1.014 / 1.014 / 1.012 |
+| KL to ground-truth labels, unseen task families (`ood`) | **0.104** | 0.128 |
+| Top-1 accuracy, unseen task families | 0.942 | **0.948** |
+| Choice top-1 flips when the options are reversed | — | 4.3% (zero-shot base: 65.7%) |
+
+† Ours bins each predicted option probability against the target probability; the JEV card does not define its ECE further, so treat the two as indicative.
+
+On Jev's own distributions the two models are indistinguishable. The one gap is transfer to unseen task families (KL 0.128 vs 0.104, between JEV-9B's 0.234 and JEV-27B), where top-1 accuracy is still on par.
 
 Validation KL during training (1,024 rows of the `validation` split, no temperature, ±0.003 noise):
 
 | step | 250 | 500 | 1,000 | 1,500 | 2,000 | 2,500 | 3,000 | 3,250 | 4,000 |
 |---|---|---|---|---|---|---|---|---|---|
-| all | 0.070 | 0.047 | 0.035 | 0.045 | 0.025 | 0.023 | 0.020 | **0.019** | *TBD* |
-| noul / score / choice at 3,250 | | | | | | | | 0.004 / 0.021 / 0.033 | |
+| all | 0.070 | 0.047 | 0.035 | 0.045 | 0.025 | 0.023 | 0.020 | 0.019 | **0.018** |
+| noul / score / choice | | | | | | | | 0.004 / 0.021 / 0.033 | 0.003 / 0.021 / 0.032 |
 
 ### Image decisions ([VL-RewardBench](https://huggingface.co/datasets/MMInstruction/VL-RewardBench), 1,247 pairs)
 
-Same protocol as the [JEV demo](https://github.com/yuhai-china/JEV-27B-DEMO/tree/main/09-multimodal-judge): both presentation orders, averaged.
+Same protocol as the [JEV demo](https://github.com/yuhai-china/JEV-27B-DEMO/tree/main/09-multimodal-judge): both presentation orders, averaged. The adapter was trained on text only, so image decisions are zero-shot for both models.
 
 | Model | general | hallucination | reasoning | overall | order-agree |
 |---|---:|---:|---:|---:|---:|
 | Bonsai 2 27B zero-shot | 60.2 | 78.9 | 72.2 | 74.5 | 50.9% |
 | JEV-9B (published) | | | | 74.3 | |
 | JEV-27B-VL (published) | 58.0 | 83.2 | 78.2 | 78.3 | 89% |
-| **Bonsai-JEV** | *TBD* | *TBD* | *TBD* | *TBD* | *TBD* |
+| **Bonsai-JEV** | 56.4 | **84.9** | 74.1 | **78.0** | 88.4% |
+
+One forward pass without averaging: 77.5 (as given) / 79.1 (swapped). 78.0 vs 78.3 is inside the ±2.4 confidence interval of 1,247 pairs: a tie. The ternary base costs reasoning (−4.1) and gains hallucination (+1.7).
 
 ### JevBench-231 (top-1 accuracy, bonjev's grading)
 
@@ -74,11 +94,17 @@ Order-agree is the share of pairs whose verdict survives swapping the two answer
 
 | | measured |
 |---|---|
-| Prompt processing / generation | 1,226 / 49.6 tok/s (`llama-bench` pp512 / tg128) |
-| Peak VRAM, model + vision + 4k context | 9.17 GB |
-| Text decision (100–300 tokens) | 0.1–0.35 s zero-shot; adapter adds an estimated 10–30% (*TBD*) |
-| Image decision, 640×480, cold | 0.5–0.9 s (vision encoder ~0.12 s) |
-| Follow-up question on a warmed scene | ~0.2 s |
+| Prompt processing / generation, PQ2_0 | 1,226 / 49.6 tok/s (`llama-bench` pp512 / tg128) |
+| Prompt processing / generation, PTQ1_0 | 1,315 / 63.1 tok/s |
+| Peak VRAM, PQ2_0 + vision + 4k context | 9.17 GB |
+| Text decision, cold, with adapter (`/v1/decide`, end to end) | p50 0.62 s, p95 0.68 s |
+| Image + two answers, cold | p50 0.99 s, p95 1.22 s |
+| Follow-up question on a warmed scene | p50 0.23 s |
+| **8 GB card** (PTQ1_0 + fp16 adapter + vision, 4k context, VRAM capped at 7.5 GiB) | text p50 0.42 s, image p50 1.04 s, ~7.1 GiB used |
+
+**PTQ1_0** (5.95 GB, the denser packing of the same ternary weights) runs the same adapter with identical decisions: 100% top-1 agreement and zero probability difference with PQ2_0 on 3,000 test rows, and it is faster. Use it on 8 GB cards.
+
+**Concurrency:** 40 concurrent decisions over 8 slots match sequential ones (max |Δp| 0.0035, no flips), with 8 chat requests mixed in (identical text, no adapter leakage). The fork batches only requests with the same LoRA set, so JEV-27B-VL's vLLM limit of 8 sequences does not apply.
 
 Max context on 12 GB: ~24–32k tokens with f16 KV, ~48–60k with q8_0 KV (only 16 of 64 layers keep a KV cache; the 48 linear-attention layers hold a fixed ~150 MB state per slot).
 
@@ -106,7 +132,7 @@ curl -s localhost:8000/v1/decide -H 'content-type: application/json' -d '{
 
 `/v1/decide` has the same request/response shape as JEV's `serve_decide.py`, so JEV's [`jev_client.py`](https://github.com/yuhai-china/JEV-27B-DEMO/blob/main/common/jev_client.py) works unchanged (`JEV_URL=http://localhost:8000 JEV_BACKEND=decide`). For several questions about one scene, `POST /v1/warm {"state": ..., "kinds": ["noul"]}` first: the model has recurrent layers, so prefix reuse needs an explicit boundary, and follow-ups then evaluate only their question tokens.
 
-**System 2 is the untouched base.** `run_decide.sh` loads the adapter with global scale 0 and the wrapper switches it on per decision request, so ordinary chat/completion requests to `llama-server` (port 8080) get Ternary Bonsai 2 exactly: with the adapter switched off, 12/12 test answers are byte-identical to a server without the adapter (`run_system2.sh`). With the adapter on, 5/12 change, so do not route chat through it.
+**System 2 is the untouched base.** `run_decide.sh` loads the adapter with global scale 0 and the wrapper switches it on per decision request, so ordinary chat/completion requests to `llama-server` (port 8080) get Ternary Bonsai 2 exactly: with the adapter switched off, 12/12 test answers are byte-identical to a server without the adapter (`run_system2.sh`). With the adapter on, 9/12 change, so do not route chat through it.
 
 ## Reproducing the training
 
@@ -138,7 +164,7 @@ LoRA r=16, α=32, dropout 0.05 on `in_proj_qkv, in_proj_z, out_proj, q/k/v/o_pro
 ## Limitations
 
 - **Quality ceiling is JEV level.** The ternary base can only take a LoRA; full fine-tunes of the same Qwen3.8-27B reach 62–66 on the [Jev Decision Index](https://huggingface.co/spaces/multimodalart/jev-decision-index) where JEV-27B scores 55.6. This model is about *memory*, not about beating them.
-- **Distilled from the same teacher as JEV**, so on text it can approach JEV-27B, not exceed it. `choice` is the hardest kind (0.033 vs JEV-9B's 0.028 at step 3,250).
+- **Distilled from the same teacher as JEV**, so on text it matches JEV-27B rather than exceeding it. Transfer to unseen task families is weaker (OOD KL 0.128 vs 0.104).
 - **Ternarisation costs more on vision than on text** (Bonsai's own card: MMMU-Pro 81.7 → 75.5). The image head is zero-shot, as in JEV-27B-VL; an image-decision training round is planned.
 - **Latency:** one decision costs the compute of a 27B forward pass. On Jetson Orin NX expect several seconds per image decision.
 

@@ -29,7 +29,7 @@ tags:
 
 The same weights also serve **System 2**: with the adapter switched off, the server is Ternary Bonsai 2 itself, byte for byte.
 
-> **Status (2026-10-14): training in progress.** This card is a draft; *TBD* entries are filled in when the run and its evaluation finish.
+> **Status (2026-10-15):** trained; all numbers below are measured through the deployment path (the fork running `adapter.gguf` on the ternary file). JevBench-231, the agent-judge benchmarks and the Decision Index run are pending.
 
 ## Built on
 
@@ -41,7 +41,7 @@ The same weights also serve **System 2**: with the adapter switched off, the ser
 | | JEV-27B / JEV-27B-VL | **Bonsai-JEV** |
 |---|---|---|
 | Base | Qwen3.8-27B, BF16 | Ternary Bonsai 2 27B, PQ2_0 (2.13 bits/weight) |
-| Download | ~54 / ~56 GB | **~8.7 GB** |
+| Download | ~54 / ~56 GB | **~8.7 GB** (PQ2_0) or ~7.4 GB (PTQ1_0) |
 | Runs on | one 80 GB+ GPU (vLLM) | 12 GB GPU (RTX 4070 tested); Jetson Orin NX 16 GB and Apple Silicon via the fork (not yet tested with the adapter) |
 | Trainable parameters | 108.8M LoRA + 123k head | same recipe, same shapes |
 | Images | zero-shot | zero-shot |
@@ -55,10 +55,22 @@ The same weights also serve **System 2**: with the adapter switched off, the ser
 |---|---:|---:|---:|---:|
 | Ternary Bonsai 2 27B, zero-shot (letter logits) | 0.443 | 0.167 | 0.724 | 0.595 |
 | JEV-9B (published) | 0.019 | 0.005 | 0.023 | 0.028 |
-| JEV-27B (published) | 0.017 | | | |
-| **Bonsai-JEV** | **0.0165** | 0.004 | 0.021 | 0.025 |
+| JEV-27B (published) | 0.017 | 0.004 | 0.021 | 0.025 |
+| **Bonsai-JEV** | **0.0163** | 0.0041 | 0.0205 | 0.0245 |
 
-Validation KL during training (1,024 rows, no temperature): 0.070 at step 250, 0.035 at 1,000, 0.025 at 2,000, **0.019 at 3,250** (noul 0.004, score 0.021, choice 0.033); final *TBD*.
+The other JEV-27B card metrics, same rows and definitions:
+
+| | JEV-27B (published) | **Bonsai-JEV** |
+|---|---:|---:|
+| Yes/no AUROC, Jev-labelled / all rows | 0.995 / 0.996 | 0.995 / 0.996 |
+| Choice top-1 agreement with Jev, Jev-labelled | 90.5% | 91.1% |
+| Choice top-1, rows with a clear top option (top-2 gap ≥ 0.1) | 95.8% | 96.2% |
+| Rating error (MAE of the expected 0–5 rating) | 0.098 | 0.097 |
+| KL to ground truth, unseen task families | **0.104** | 0.128 |
+| Top-1 accuracy, unseen task families | 0.942 | 0.948 |
+| Choice top-1 flips when the options are reversed | — | 4.3% |
+
+Fitted temperatures 1.014 / 1.014 / 1.012 (noul / score / choice): the model is calibrated by training. Validation KL fell from 0.070 at step 250 to 0.018 at step 4,000, flat over the last 250 steps.
 
 **Image decisions**, [VL-RewardBench](https://huggingface.co/datasets/MMInstruction/VL-RewardBench) (1,247 pairs, both orders averaged, the JEV demo protocol):
 
@@ -66,7 +78,9 @@ Validation KL during training (1,024 rows, no temperature): 0.070 at step 250, 0
 |---|---:|---:|---:|---:|---:|
 | Ternary Bonsai 2 27B, zero-shot | 74.5 | 78.9 | 72.2 | 60.2 | 50.9% |
 | JEV-27B-VL (published) | 78.3 | 83.2 | 78.2 | 58.0 | 89% |
-| **Bonsai-JEV** | *TBD* | *TBD* | *TBD* | *TBD* | *TBD* |
+| **Bonsai-JEV** | **78.0** | **84.9** | 74.1 | 56.4 | 88.4% |
+
+A tie with JEV-27B-VL (±2.4 at 1,247 pairs). One forward pass without averaging: 77.5 / 79.1 (as given / swapped).
 
 Order-agree is the share of pairs whose verdict survives swapping the two answers; it shows whether a single forward pass can be trusted.
 
@@ -74,11 +88,14 @@ Order-agree is the share of pairs whose verdict survives swapping the two answer
 
 | | |
 |---|---|
-| Prompt processing / generation | 1,226 / 49.6 tokens/s |
-| Peak VRAM (model + vision + 4k context) | 9.17 GB |
-| Text decision, 100–300 tokens | 0.1–0.35 s zero-shot; with adapter *TBD* |
-| Image decision, 640×480, cold / follow-up on a warmed scene | 0.5–0.9 s / ~0.2 s |
+| Prompt processing / generation, PQ2_0 / PTQ1_0 | 1,226 / 49.6 and 1,315 / 63.1 tokens/s |
+| Peak VRAM (PQ2_0 + vision + 4k context) | 9.17 GB |
+| `/v1/decide` end to end: text / image + two answers, cold (p50) | 0.62 s / 0.99 s |
+| Follow-up question on a warmed scene (p50) | 0.23 s |
+| 8 GB card: PTQ1_0 + fp16 adapter + vision, 4k context, VRAM capped at 7.5 GiB | text 0.42 s, image 1.04 s (p50), ~7.1 GiB used |
 | Max context on 12 GB | ~24–32k tokens (f16 KV), ~48–60k (q8_0 KV) |
+
+**PTQ1_0** runs the same adapter with identical decisions (100% top-1 agreement, zero probability difference on 3,000 rows) and is faster. **Concurrency:** 40 concurrent decisions over 8 slots match sequential ones (max |Δp| 0.0035, no flips; mixed chat unaffected); the fork batches only requests with the same LoRA set.
 
 ## Quickstart
 
@@ -131,6 +148,8 @@ The probabilities are read from the verbalizer tokens at `[decision]:` (`false/t
 | File | Size | What |
 |---|---:|---|
 | `Ternary-Bonsai-2-27B-PQ2_0.gguf` | 7.2 GB | Prism ML's base, byte-identical to the validated file |
+| `Ternary-Bonsai-2-27B-PTQ1_0.gguf` | 5.95 GB | the same weights, denser packing; for 8 GB cards (`BASE_GGUF=Ternary-Bonsai-2-27B-PTQ1_0.gguf`) |
+| `adapter_f16.gguf` | 0.23 GB | the adapter in fp16, for 8 GB cards (`ADAPTER_FILE=adapter_f16.gguf`) |
 | `Ternary-Bonsai-2-27B-mmproj-Q8_0.gguf` | 0.6 GB | vision projector |
 | `adapter.gguf` | 0.46 GB | LoRA on all 64 layers + the decision head as a rank-24 LoRA on `output.weight` |
 | `decision.json` | — | head bias, verbalizer ids, slot ranges, per-kind temperatures |
@@ -149,7 +168,7 @@ Code, alignment checks and the full log of decisions: [GitHub](https://github.co
 ## Limitations
 
 - **Quality ceiling is JEV level.** The ternary base can only take a LoRA. Full fine-tunes of Qwen3.8-27B score higher on the [Jev Decision Index](https://huggingface.co/spaces/multimodalart/jev-decision-index); this model is about memory, not about beating them.
-- **Same teacher as JEV**, so on text it approaches JEV-27B rather than exceeding it. `choice` is the hardest kind.
+- **Same teacher as JEV**, so on text it matches JEV-27B rather than exceeding it. Transfer to unseen task families is weaker (KL 0.128 vs 0.104).
 - **Ternarisation costs more on vision than on text** (Bonsai's card: MMMU-Pro 81.7 → 75.5). Image decisions are zero-shot, as in JEV-27B-VL.
 - **English prompts.** The training data is English; decisions on other languages are untested.
 - **Latency:** each decision is a 27B forward pass; on Jetson Orin NX expect seconds per image decision.
