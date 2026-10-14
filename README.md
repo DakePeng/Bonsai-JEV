@@ -195,7 +195,7 @@ LoRA r=16, α=32, dropout 0.05 on `in_proj_qkv, in_proj_z, out_proj, q/k/v/o_pro
 
 Code and adapter weights in this repository: **Apache 2.0** (see `LICENSE` and `NOTICE`).
 
-- **Created using Bonsai by Prism ML.** Ternary Bonsai 2 27B is Apache 2.0, © Prism ML, Inc., built from Qwen3.8-27B (© Alibaba Cloud, Apache 2.0). Base weights are not redistributed here.
+- **Created using Bonsai by Prism ML.** Ternary Bonsai 2 27B is Apache 2.0, © Prism ML, Inc., built from Qwen3.8-27B (© Alibaba Cloud, Apache 2.0). Base weights are not in this GitHub repository; the model repositories redistribute them unchanged with Prism ML's LICENSE and NOTICE.
 - [PrismML llama.cpp fork](https://github.com/PrismML-Eng/llama.cpp): MIT, © the ggml authors. The files under `tools/` are written against it.
 - Training recipe, prompt template and verbalizers follow [autotrust/JEV-9B](https://huggingface.co/autotrust/JEV-9B) and [JEV-27B](https://huggingface.co/autotrust/JEV-27B) (Apache 2.0).
 - Trained on [SargeDev/jev-distill-corpus-v3](https://huggingface.co/datasets/SargeDev/jev-distill-corpus-v3) (Apache 2.0; `openjev_v2` stream CC0). This is the same corpus JEV-9B and JEV-27B were trained on and released under Apache 2.0. Its `yuri_v3` labels (2/3 of the corpus) are output distributions of TypeSafe's Jev 1.13; as with JEV, users planning commercial use may want to review TypeSafe's API terms themselves.

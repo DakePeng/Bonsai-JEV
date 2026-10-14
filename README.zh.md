@@ -195,7 +195,7 @@ LoRA r=16、α=32、dropout 0.05，挂在全部 64 层的 `in_proj_qkv, in_proj_
 
 本仓库的代码和适配器权重：**Apache 2.0**（见 `LICENSE` 和 `NOTICE`）。
 
-- **Created using Bonsai by Prism ML.** Ternary Bonsai 2 27B 为 Apache 2.0，© Prism ML, Inc.，基于 Qwen3.8-27B（© 阿里云，Apache 2.0）。本仓库不再分发底座权重。
+- **Created using Bonsai by Prism ML.** Ternary Bonsai 2 27B 为 Apache 2.0，© Prism ML, Inc.，基于 Qwen3.8-27B（© 阿里云，Apache 2.0）。GitHub 仓库里没有底座权重；模型仓库原样附带底座文件，以及 Prism ML 的 LICENSE 和 NOTICE。
 - [PrismML 的 llama.cpp 分支](https://github.com/PrismML-Eng/llama.cpp)：MIT，© the ggml authors。`tools/` 下的文件针对它编写。
 - 训练配方、提示词模板和 verbalizer 沿用 [autotrust/JEV-9B](https://huggingface.co/autotrust/JEV-9B) 和 [JEV-27B](https://huggingface.co/autotrust/JEV-27B)（Apache 2.0）。
 - 训练数据为 [SargeDev/jev-distill-corpus-v3](https://huggingface.co/datasets/SargeDev/jev-distill-corpus-v3)（Apache 2.0；`openjev_v2` 部分源头为 CC0）。JEV-9B 和 JEV-27B 用的也是这份语料，并以 Apache 2.0 发布。其中 `yuri_v3` 的标签（占语料三分之二）是 TypeSafe 的 Jev 1.13 的输出分布；和 JEV 一样，计划商用的使用者可以自行查看 TypeSafe 的 API 条款。

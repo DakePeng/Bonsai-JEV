@@ -164,8 +164,10 @@ The probabilities are read from the verbalizer tokens at `[decision]:` (`false/t
 | `adapter.gguf` | 0.46 GB | LoRA on all 64 layers + the decision head as a rank-24 LoRA on `output.weight` |
 | `decision.json` | — | head bias, verbalizer ids, slot ranges, per-kind temperatures |
 | `peft/`, `head.safetensors` | 0.44 GB | the same adapter for PyTorch / further training |
-| `decide_server.py`, `run_decide.sh` | — | `/v1/decide` and `/v1/warm` over `llama-server` |
-| `LICENSE`, `NOTICE` | — | Apache 2.0; attributions incl. Prism ML's NOTICE |
+| `calibration.json`, `head.json` | — | fitted temperatures and fit statistics; head metadata (step 4,000) |
+| `decide_server.py`, `run_decide.sh`, `zeroshot_text.py` | — | `/v1/decide` and `/v1/warm` over `llama-server` |
+| `LICENSE`, `NOTICE` | — | Apache 2.0; attributions |
+| `LICENSE-Ternary-Bonsai-2`, `NOTICE-Ternary-Bonsai-2.txt`, `KNOWN_ISSUES-Ternary-Bonsai-2.md` | — | Prism ML's license, notice and known issues for the base files, unchanged |
 
 The adapter is bound to this exact base file (Hadamard rotation metadata, value-head layout). Use the bundled GGUF rather than a newer or older Bonsai 2 file.
 

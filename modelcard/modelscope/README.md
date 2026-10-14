@@ -165,9 +165,11 @@ B) <选项 2>
 | `adapter.gguf` | 0.46 GB | 64 层上的 LoRA + 作为 `output.weight` 上 rank-24 LoRA 的决策头 |
 | `decision.json` | — | 决策头偏置、verbalizer id、槽位范围、按类型温度 |
 | `peft/`、`head.safetensors` | 0.44 GB | 同一个适配器的 PyTorch 版本，可继续训练 |
-| `decide_server.py`、`run_decide.sh` | — | 套在 `llama-server` 上的 `/v1/decide` 和 `/v1/warm` |
+| `calibration.json`、`head.json` | — | 拟合的温度和拟合统计；决策头元数据（第 4,000 步） |
+| `decide_server.py`、`run_decide.sh`、`zeroshot_text.py` | — | 套在 `llama-server` 上的 `/v1/decide` 和 `/v1/warm` |
 | `configuration.json` | — | ModelScope 仓库配置 |
-| `LICENSE`、`NOTICE` | — | Apache 2.0；署名，含 Prism ML 的 NOTICE |
+| `LICENSE`、`NOTICE` | — | Apache 2.0；署名 |
+| `LICENSE-Ternary-Bonsai-2`、`NOTICE-Ternary-Bonsai-2.txt`、`KNOWN_ISSUES-Ternary-Bonsai-2.md` | — | Prism ML 为底座文件提供的许可证、NOTICE 和已知问题，原样附上 |
 
 适配器和这个底座文件是绑定的（Hadamard 旋转元数据、value 头排布）。请使用仓库附带的 GGUF，不要换成更新或更旧的 Bonsai 2 文件。
 
