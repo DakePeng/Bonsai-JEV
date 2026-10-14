@@ -42,9 +42,11 @@ def render_perm(r, p):
 
 
 def run(args):
-    rows = load_split(args.data, args.split, True, None, args.limit)
+    rows = load_split(args.data, args.split, True, None, 0)
     if args.kinds:
         rows = [r for r in rows if r["kind"] in args.kinds.split(",")]
+    if args.limit:
+        rows = rows[:args.limit]
     perms = [perm_for(r, args.permute) for r in rows]
     bias = [0.0] * 24
     lora = []
