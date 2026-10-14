@@ -25,7 +25,7 @@ case "${1:-start}" in
     # -np 2: two slots; the server routes a request to the slot with the longest common prefix.
     # --cache-ram / --cache-reuse: keep evicted prompts in RAM and reuse partial prefixes (KNOWN_ISSUES.md).
     setsid nohup $BIN/llama-server -m $M/Ternary-Bonsai-2-27B-PQ2_0.gguf --mmproj $M/Ternary-Bonsai-2-27B-mmproj-Q8_0.gguf \
-      $LORA -ngl 99 -c 8192 -np 2 --cache-ram 16384 --cache-reuse 256 --port $LPORT --host 127.0.0.1 \
+      $LORA -ngl 99 -c ${CTX:-8192} -np ${NP:-2} --cache-ram 16384 --cache-reuse 256 --port $LPORT --host 127.0.0.1 \
       > results/llama_server.log 2>&1 < /dev/null &
     for i in $(seq 1 60); do curl -sf http://127.0.0.1:$LPORT/health > /dev/null && break; sleep 2; done
     curl -sf http://127.0.0.1:$LPORT/health > /dev/null || { echo "llama-server failed, see results/llama_server.log"; exit 1; }
