@@ -9,19 +9,17 @@ M=~/bonsai/models/bonsai2-27b; BIN=~/bonsai/llama.cpp/build/bin
 log() { echo; echo "[$(date +%H:%M)] ===== $*"; }
 stop_all() { bash run_decide.sh stop > /dev/null 2>&1; }
 
-# ---- 0. pick the checkpoint
+# ---- 0. pick the checkpoint on the calibration split (validation KL ties within noise; never select on test)
 read FINAL TAG < <(python3 - <<'EOF'
-import json, glob, os
+import json, os
 best = None
-for p in glob.glob("results/*_test30k_cal.metrics.json"):
-    tag = os.path.basename(p)[:-len("_test30k_cal.metrics.json")]
-    if not tag.split("_")[0] in ("best", "last"):
-        continue
-    kl = json.load(open(p))["src:yuri_v3"]["kl"]
+for name in ("best", "last"):
+    d = os.path.expanduser(f"~/bonsai/ckpt-run1/{name}")
+    kl = sum(json.load(open(f"{d}/calibration.json"))["kl_after"].values())   # ponytail: unweighted over kinds
+    step = json.load(open(f"{d}/head.json"))["step"]
     if best is None or kl < best[0]:
-        best = (kl, tag)
-kl, tag = best
-print(os.path.expanduser(f"~/bonsai/ckpt-run1/{tag.split('_')[0]}"), tag)
+        best = (kl, d, f"{name}_{step}")
+print(best[1], best[2])
 EOF
 )
 log "selected $TAG ($FINAL)"
