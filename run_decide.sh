@@ -26,6 +26,10 @@ case "${1:-start}" in
       > results/llama_server.log 2>&1 < /dev/null &
     for i in $(seq 1 60); do curl -sf http://127.0.0.1:$LPORT/health > /dev/null && break; sleep 2; done
     curl -sf http://127.0.0.1:$LPORT/health > /dev/null || { echo "llama-server failed, see results/llama_server.log"; exit 1; }
+    # adapter OFF globally (System 2 = untouched base); decide_server switches it on per decision request.
+    # --lora-init-without-apply alone does not take effect in this fork's server, so set it explicitly.
+    [ -n "$ADAPTER" ] && curl -sf -X POST http://127.0.0.1:$LPORT/lora-adapters -H "content-type: application/json" \
+      -d '[{"id": 0, "scale": 0}]' > /dev/null && echo "adapter loaded, global scale 0: $(curl -s http://127.0.0.1:$LPORT/lora-adapters)"
     . ~/bonsai/venv/bin/activate
     LLAMA_URL=http://127.0.0.1:$LPORT DECISION_JSON=$DJ setsid nohup uvicorn decide_server:app --host 0.0.0.0 --port $PORT \
       > results/decide_server.log 2>&1 < /dev/null &
