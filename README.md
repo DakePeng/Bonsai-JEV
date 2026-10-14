@@ -11,6 +11,15 @@
 | Runs on | H100 / B200 | RTX 4070 12 GB (tested); Jetson Orin NX 16 GB and Apple Silicon via the fork (not yet tested with the adapter) |
 | Trainable | 108.8M LoRA + 123k head | same recipe, same shapes |
 
+## Built on
+
+This project stands on two releases and would not exist without them:
+
+- **[Ternary Bonsai 2 27B](https://huggingface.co/prism-ml/Ternary-Bonsai-2-27B-gguf) by [Prism ML](https://huggingface.co/prism-ml)** (Apache 2.0). *Created using Bonsai by Prism ML.* We use its ternary weights unchanged as the frozen base, its Hadamard-rotated format and `prism.hadamard.*` metadata, its vision projector, and the [PrismML llama.cpp fork](https://github.com/PrismML-Eng/llama.cpp) (MIT) as the runtime. Bonsai 2 is itself built from Qwen3.8-27B by Alibaba Cloud (Apache 2.0).
+- **[JEV-9B](https://huggingface.co/autotrust/JEV-9B) and [JEV-27B](https://huggingface.co/autotrust/JEV-27B) by [autotrust](https://huggingface.co/autotrust)** (Apache 2.0). We reproduce their training recipe (LoRA targets and rank, 24-slot decision head and its initialisation, KL + RPS loss, option shuffling, stratified batching, optimiser and schedule), their `bare-v1` prompt template and verbalizer token ids, their "decision head as an lm_head LoRA" serving trick, the `/v1/decide` API shape of their `serve_decide.py`, and their published numbers as our targets. Their [JEV-27B-VL](https://huggingface.co/autotrust/JEV-27B-VL) card and the [JEV-27B-DEMO](https://github.com/yuhai-china/JEV-27B-DEMO) repository supplied the VL-RewardBench protocol and the client we evaluate through.
+
+Bonsai-JEV-27B is the JEV recipe applied to the Bonsai 2 base; credit for both ideas belongs to their authors.
+
 > **Status (2026-10-14): training in progress.** Validation KL is below; test-set numbers, the released adapter and the image benchmarks will be filled in when the run finishes. Entries marked *TBD* are not measured yet.
 
 ## Results

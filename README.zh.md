@@ -11,6 +11,15 @@
 | 能跑在 | H100 / B200 | RTX 4070 12 GB（已测）；Jetson Orin NX 16 GB 和 Apple Silicon 走分支的后端（尚未带适配器测试） |
 | 训练参数 | 1.088 亿 LoRA + 12.3 万决策头 | 同一配方、同样的形状 |
 
+## 基于
+
+本项目建立在两个发布之上，没有它们就不会有这个项目：
+
+- **[Ternary Bonsai 2 27B](https://huggingface.co/prism-ml/Ternary-Bonsai-2-27B-gguf)，作者 [Prism ML](https://huggingface.co/prism-ml)**（Apache 2.0）。*Created using Bonsai by Prism ML.* 我们原样使用它的三值权重作为冻结底座，使用它的 Hadamard 旋转格式和 `prism.hadamard.*` 元数据、它的视觉投影，以及 [PrismML 的 llama.cpp 分支](https://github.com/PrismML-Eng/llama.cpp)（MIT）作为运行时。Bonsai 2 本身基于阿里云的 Qwen3.8-27B（Apache 2.0）。
+- **[JEV-9B](https://huggingface.co/autotrust/JEV-9B) 和 [JEV-27B](https://huggingface.co/autotrust/JEV-27B)，作者 [autotrust](https://huggingface.co/autotrust)**（Apache 2.0）。我们复现了它们的训练配方（LoRA 的挂载位置和秩、24 位决策头及其初始化、KL + RPS 损失、选项打乱、分层批次、优化器和学习率调度），沿用它们的 `bare-v1` 提示词模板和 verbalizer token id、"把决策头表示成 lm_head 上的 LoRA"的部署做法、它们 `serve_decide.py` 的 `/v1/decide` 接口格式，并以它们公开的数字作为目标。[JEV-27B-VL](https://huggingface.co/autotrust/JEV-27B-VL) 的模型卡和 [JEV-27B-DEMO](https://github.com/yuhai-china/JEV-27B-DEMO) 仓库提供了 VL-RewardBench 的评测协议和我们评测时使用的客户端。
+
+Bonsai-JEV-27B 就是把 JEV 的配方用在 Bonsai 2 底座上；两部分思路的功劳都属于各自的作者。
+
 > **状态（2026-10-14）：训练进行中。** 下面是验证集 KL；测试集数字、发布的适配器和看图评测在训练结束后补上。标 *待测* 的还没有测。
 
 ## 结果
