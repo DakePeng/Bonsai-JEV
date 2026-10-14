@@ -22,7 +22,7 @@ tags:
 - on-device
 ---
 
-# Bonsai-JEV-27B
+# Bonsai-JEV
 
 **约 9 GB 就能跑、能看图、输出校准概率的 27B 决策模型。** 把 [JEV](https://modelscope.cn/models/autotrust/JEV-27B) 的配方（LoRA + 24 位决策头，用软标签蒸馏）训练在 [Ternary Bonsai 2 27B](https://modelscope.cn/models/prism-ml/Ternary-Bonsai-2-27B-gguf) 上。后者是 Prism ML 把 Qwen3.8-27B 压缩成三值的版本。对一个有类型的问题（是/否、0–5 打分、2–16 选 1）提问，状态里可以带图，一次前向就输出各选项的校准概率，不生成文字。
 
@@ -30,7 +30,7 @@ tags:
 
 > **状态（2026-10-14）：训练进行中。** 本卡片为草稿，标 *待测* 的在训练和评测完成后补上。
 
-[English model card on Hugging Face](https://huggingface.co/dakebakery/Bonsai-JEV-27B)
+[English model card on Hugging Face](https://huggingface.co/dakebakery/Bonsai-JEV)
 
 ## 基于
 
@@ -39,7 +39,7 @@ tags:
 
 ## 一览
 
-| | JEV-27B / JEV-27B-VL | **Bonsai-JEV-27B** |
+| | JEV-27B / JEV-27B-VL | **Bonsai-JEV** |
 |---|---|---|
 | 底座 | Qwen3.8-27B，BF16 | Ternary Bonsai 2 27B，PQ2_0（2.13 bit/权重） |
 | 下载大小 | 约 54 / 56 GB | **约 8.7 GB** |
@@ -57,7 +57,7 @@ tags:
 | Ternary Bonsai 2 27B 零样本（读字母 logits） | 0.443 | 0.167 | 0.724 | 0.595 |
 | JEV-9B（公开） | 0.019 | 0.005 | 0.023 | 0.028 |
 | JEV-27B（公开） | 0.017 | | | |
-| **Bonsai-JEV-27B** | *待测* | *待测* | *待测* | *待测* |
+| **Bonsai-JEV** | *待测* | *待测* | *待测* | *待测* |
 
 训练中的验证 KL（1,024 行，未做温度校准）：第 250 步 0.070，第 1,000 步 0.035，第 2,000 步 0.025，**第 3,250 步 0.019**（noul 0.004、score 0.021、choice 0.033）；最终结果 *待测*。
 
@@ -67,7 +67,7 @@ tags:
 |---|---:|---:|---:|---:|---:|
 | Ternary Bonsai 2 27B 零样本 | 74.5 | 78.9 | 72.2 | 60.2 | 50.9% |
 | JEV-27B-VL（公开） | 78.3 | 83.2 | 78.2 | 58.0 | 89% |
-| **Bonsai-JEV-27B** | *待测* | *待测* | *待测* | *待测* | *待测* |
+| **Bonsai-JEV** | *待测* | *待测* | *待测* | *待测* | *待测* |
 
 顺序一致率是把两个回答换位后结论不变的比例，反映单次前向的结果是否可信。
 
@@ -86,9 +86,9 @@ tags:
 从源码编译 [PrismML 的 llama.cpp 分支](https://github.com/PrismML-Eng/llama.cpp)（CUDA 或 Metal）。原版 llama.cpp 加载不了这些文件；AVX-512 CPU（比如 AMD Zen 4）上一定要自己编译，发布的二进制一加载就崩。
 
 ```bash
-modelscope download --model dakepeng/Bonsai-JEV-27B --local_dir Bonsai-JEV-27B
+modelscope download --model dakepeng/Bonsai-JEV --local_dir Bonsai-JEV-weights
 git clone https://github.com/DakePeng/Bonsai-JEV && cd Bonsai-JEV
-bash run_decide.sh start ../Bonsai-JEV-27B      # llama-server 在 :8080，/v1/decide 在 :8000
+bash run_decide.sh start ../Bonsai-JEV-weights      # llama-server 在 :8080，/v1/decide 在 :8000
 ```
 
 ### System 1：类型化决策

@@ -1,10 +1,10 @@
-# Bonsai-JEV-27B
+# Bonsai-JEV
 
 **A calibrated, image-capable 27B decision model that runs in ~9 GB.** The [JEV](https://huggingface.co/autotrust/JEV-27B) recipe (LoRA + 24-slot decision head, distilled to soft labels) trained on top of [Ternary Bonsai 2 27B](https://huggingface.co/prism-ml/Ternary-Bonsai-2-27B-gguf), PrismML's ternary (−1/0/+1) compression of Qwen3.8-27B. The base stays ternary and frozen; the adapter is a separate file. One forward pass returns calibrated probabilities over the options of a typed question (yes/no, 0–5 score, or 2–16-way choice), with or without images.
 
 [中文说明](README.zh.md)
 
-| | JEV-27B / JEV-27B-VL | **Bonsai-JEV-27B** |
+| | JEV-27B / JEV-27B-VL | **Bonsai-JEV** |
 |---|---|---|
 | Base | Qwen3.8-27B, BF16 | Ternary Bonsai 2 27B, PQ2_0 (2.13 bpw) |
 | Weights in memory | ~54 GB (vLLM, one 80 GB GPU) | **7.2 GB** base + 0.6 GB vision + 0.46 GB adapter |
@@ -18,7 +18,7 @@ This project stands on two releases and would not exist without them:
 - **[Ternary Bonsai 2 27B](https://huggingface.co/prism-ml/Ternary-Bonsai-2-27B-gguf) by [Prism ML](https://huggingface.co/prism-ml)** (Apache 2.0). *Created using Bonsai by Prism ML.* We use its ternary weights unchanged as the frozen base, its Hadamard-rotated format and `prism.hadamard.*` metadata, its vision projector, and the [PrismML llama.cpp fork](https://github.com/PrismML-Eng/llama.cpp) (MIT) as the runtime. Bonsai 2 is itself built from Qwen3.8-27B by Alibaba Cloud (Apache 2.0).
 - **[JEV-9B](https://huggingface.co/autotrust/JEV-9B) and [JEV-27B](https://huggingface.co/autotrust/JEV-27B) by [autotrust](https://huggingface.co/autotrust)** (Apache 2.0). We reproduce their training recipe (LoRA targets and rank, 24-slot decision head and its initialisation, KL + RPS loss, option shuffling, stratified batching, optimiser and schedule), their `bare-v1` prompt template and verbalizer token ids, their "decision head as an lm_head LoRA" serving trick, the `/v1/decide` API shape of their `serve_decide.py`, and their published numbers as our targets. Their [JEV-27B-VL](https://huggingface.co/autotrust/JEV-27B-VL) card and the [JEV-27B-DEMO](https://github.com/yuhai-china/JEV-27B-DEMO) repository supplied the VL-RewardBench protocol and the client we evaluate through.
 
-Bonsai-JEV-27B is the JEV recipe applied to the Bonsai 2 base; credit for both ideas belongs to their authors.
+Bonsai-JEV is the JEV recipe applied to the Bonsai 2 base; credit for both ideas belongs to their authors.
 
 > **Status (2026-10-14): training in progress.** Validation KL is below; test-set numbers, the released adapter and the image benchmarks will be filled in when the run finishes. Entries marked *TBD* are not measured yet.
 
@@ -33,7 +33,7 @@ KL(target ‖ model), lower is better, after per-kind temperature. "Jev-labelled
 | Bonsai 2 27B zero-shot (no adapter, letter logits) | 0.443 | 0.481 | 0.167 | 0.724 | 0.595 |
 | JEV-9B (published) | 0.019 | 0.021 | 0.005 | 0.023 | 0.028 |
 | JEV-27B (published) | 0.017 | 0.019 | | | |
-| **Bonsai-JEV-27B** | *TBD* | *TBD* | *TBD* | *TBD* | *TBD* |
+| **Bonsai-JEV** | *TBD* | *TBD* | *TBD* | *TBD* | *TBD* |
 
 \* Our "all" excludes the 2,260 `yuri_v1` rows whose labels are placeholder `[0.5, 0.5]`; JEV's includes them.
 
@@ -53,7 +53,7 @@ Same protocol as the [JEV demo](https://github.com/yuhai-china/JEV-27B-DEMO/tree
 | Bonsai 2 27B zero-shot | 60.2 | 78.9 | 72.2 | 74.5 | 50.9% |
 | JEV-9B (published) | | | | 74.3 | |
 | JEV-27B-VL (published) | 58.0 | 83.2 | 78.2 | 78.3 | 89% |
-| **Bonsai-JEV-27B** | *TBD* | *TBD* | *TBD* | *TBD* | *TBD* |
+| **Bonsai-JEV** | *TBD* | *TBD* | *TBD* | *TBD* | *TBD* |
 
 Order-agree is the share of pairs whose verdict survives swapping the two answers. The ternary base alone is near a coin flip per order; the averaged score hides that. We report it for every model.
 
@@ -73,14 +73,14 @@ Max context on 12 GB: ~24–32k tokens with f16 KV, ~48–60k with q8_0 KV (only
 
 Requires the [PrismML llama.cpp fork](https://github.com/PrismML-Eng/llama.cpp) built from source with CUDA (stock llama.cpp cannot load PQ2_0; on AVX-512 CPUs such as Zen 4 the release binaries crash on load, see the model's KNOWN_ISSUES).
 
-Everything needed to serve (base GGUF, vision projector, adapter, calibration) is in one model repo, mirrored on [Hugging Face](https://huggingface.co/dakebakery/Bonsai-JEV-27B) and [ModelScope](https://modelscope.cn/models/dakepeng/Bonsai-JEV-27B) (uploaded at release). The base is Prism ML's file, byte-identical to the one the adapter was validated against.
+Everything needed to serve (base GGUF, vision projector, adapter, calibration) is in one model repo, mirrored on [Hugging Face](https://huggingface.co/dakebakery/Bonsai-JEV) and [ModelScope](https://modelscope.cn/models/dakepeng/Bonsai-JEV) (uploaded at release). The base is Prism ML's file, byte-identical to the one the adapter was validated against.
 
 ```bash
 # ≈ 8.7 GB. Either source:
-huggingface-cli download dakebakery/Bonsai-JEV-27B --local-dir ~/bonsai/Bonsai-JEV-27B
-modelscope download --model dakepeng/Bonsai-JEV-27B --local_dir ~/bonsai/Bonsai-JEV-27B     # faster from mainland China
+huggingface-cli download dakebakery/Bonsai-JEV --local-dir ~/bonsai/Bonsai-JEV-weights
+modelscope download --model dakepeng/Bonsai-JEV --local_dir ~/bonsai/Bonsai-JEV-weights     # faster from mainland China
 # start llama-server + the /v1/decide wrapper
-bash run_decide.sh start ~/bonsai/Bonsai-JEV-27B
+bash run_decide.sh start ~/bonsai/Bonsai-JEV-weights
 ```
 
 ```bash

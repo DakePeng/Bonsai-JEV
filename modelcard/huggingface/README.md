@@ -23,7 +23,7 @@ tags:
 - on-device
 ---
 
-# Bonsai-JEV-27B
+# Bonsai-JEV
 
 **A calibrated, image-capable 27B decision model in ~9 GB.** The [JEV](https://huggingface.co/autotrust/JEV-27B) recipe (a LoRA plus a 24-slot decision head, distilled to soft labels) trained on [Ternary Bonsai 2 27B](https://huggingface.co/prism-ml/Ternary-Bonsai-2-27B-gguf), Prism ML's ternary compression of Qwen3.8-27B. Ask a typed question (yes/no, 0–5 score, or 2–16-way choice) about a state that can include images; one forward pass returns calibrated probabilities over the options. No text is generated.
 
@@ -38,7 +38,7 @@ The same weights also serve **System 2**: with the adapter switched off, the ser
 
 ## At a glance
 
-| | JEV-27B / JEV-27B-VL | **Bonsai-JEV-27B** |
+| | JEV-27B / JEV-27B-VL | **Bonsai-JEV** |
 |---|---|---|
 | Base | Qwen3.8-27B, BF16 | Ternary Bonsai 2 27B, PQ2_0 (2.13 bits/weight) |
 | Download | ~54 / ~56 GB | **~8.7 GB** |
@@ -56,7 +56,7 @@ The same weights also serve **System 2**: with the adapter switched off, the ser
 | Ternary Bonsai 2 27B, zero-shot (letter logits) | 0.443 | 0.167 | 0.724 | 0.595 |
 | JEV-9B (published) | 0.019 | 0.005 | 0.023 | 0.028 |
 | JEV-27B (published) | 0.017 | | | |
-| **Bonsai-JEV-27B** | *TBD* | *TBD* | *TBD* | *TBD* |
+| **Bonsai-JEV** | *TBD* | *TBD* | *TBD* | *TBD* |
 
 Validation KL during training (1,024 rows, no temperature): 0.070 at step 250, 0.035 at 1,000, 0.025 at 2,000, **0.019 at 3,250** (noul 0.004, score 0.021, choice 0.033); final *TBD*.
 
@@ -66,7 +66,7 @@ Validation KL during training (1,024 rows, no temperature): 0.070 at step 250, 0
 |---|---:|---:|---:|---:|---:|
 | Ternary Bonsai 2 27B, zero-shot | 74.5 | 78.9 | 72.2 | 60.2 | 50.9% |
 | JEV-27B-VL (published) | 78.3 | 83.2 | 78.2 | 58.0 | 89% |
-| **Bonsai-JEV-27B** | *TBD* | *TBD* | *TBD* | *TBD* | *TBD* |
+| **Bonsai-JEV** | *TBD* | *TBD* | *TBD* | *TBD* | *TBD* |
 
 Order-agree is the share of pairs whose verdict survives swapping the two answers; it shows whether a single forward pass can be trusted.
 
@@ -85,9 +85,9 @@ Order-agree is the share of pairs whose verdict survives swapping the two answer
 Build the [PrismML llama.cpp fork](https://github.com/PrismML-Eng/llama.cpp) from source with CUDA (or Metal). Stock llama.cpp cannot load these files; on AVX-512 CPUs (e.g. AMD Zen 4) use a source build, the release binaries crash on load.
 
 ```bash
-huggingface-cli download dakebakery/Bonsai-JEV-27B --local-dir Bonsai-JEV-27B
+huggingface-cli download dakebakery/Bonsai-JEV --local-dir Bonsai-JEV-weights
 git clone https://github.com/DakePeng/Bonsai-JEV && cd Bonsai-JEV
-bash run_decide.sh start ../Bonsai-JEV-27B      # llama-server on :8080 + /v1/decide on :8000
+bash run_decide.sh start ../Bonsai-JEV-weights      # llama-server on :8080 + /v1/decide on :8000
 ```
 
 ### System 1: typed decisions
@@ -162,4 +162,4 @@ Thanks to Prism ML, autotrust, SargeDev, the Qwen team and the maintainers of th
 
 ## Also on ModelScope
 
-[modelscope.cn/models/dakepeng/Bonsai-JEV-27B](https://modelscope.cn/models/dakepeng/Bonsai-JEV-27B), same files, faster from mainland China.
+[modelscope.cn/models/dakepeng/Bonsai-JEV](https://modelscope.cn/models/dakepeng/Bonsai-JEV), same files, faster from mainland China.

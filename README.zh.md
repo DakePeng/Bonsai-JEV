@@ -1,10 +1,10 @@
-# Bonsai-JEV-27B
+# Bonsai-JEV
 
 **一个约 9 GB 就能跑、能看图、输出校准概率的 27B 决策模型。** 把 [JEV](https://huggingface.co/autotrust/JEV-27B) 的配方（LoRA + 24 位决策头，用软标签蒸馏）训练在 [Ternary Bonsai 2 27B](https://huggingface.co/prism-ml/Ternary-Bonsai-2-27B-gguf) 上。后者是 PrismML 把 Qwen3.8-27B 压缩成三值（−1/0/+1）的版本。底座保持三值、冻结不动，适配器是单独一个文件。对一个有类型的问题（是/否、0–5 打分、2–16 选 1），带图或不带图，一次前向就输出各选项的校准概率。
 
 [English](README.md)
 
-| | JEV-27B / JEV-27B-VL | **Bonsai-JEV-27B** |
+| | JEV-27B / JEV-27B-VL | **Bonsai-JEV** |
 |---|---|---|
 | 底座 | Qwen3.8-27B，BF16 | Ternary Bonsai 2 27B，PQ2_0（2.13 bit/权重） |
 | 显存中的权重 | 约 54 GB（vLLM，一张 80 GB 卡） | **7.2 GB** 底座 + 0.6 GB 视觉 + 0.46 GB 适配器 |
@@ -18,7 +18,7 @@
 - **[Ternary Bonsai 2 27B](https://huggingface.co/prism-ml/Ternary-Bonsai-2-27B-gguf)，作者 [Prism ML](https://huggingface.co/prism-ml)**（Apache 2.0）。*Created using Bonsai by Prism ML.* 我们原样使用它的三值权重作为冻结底座，使用它的 Hadamard 旋转格式和 `prism.hadamard.*` 元数据、它的视觉投影，以及 [PrismML 的 llama.cpp 分支](https://github.com/PrismML-Eng/llama.cpp)（MIT）作为运行时。Bonsai 2 本身基于阿里云的 Qwen3.8-27B（Apache 2.0）。
 - **[JEV-9B](https://huggingface.co/autotrust/JEV-9B) 和 [JEV-27B](https://huggingface.co/autotrust/JEV-27B)，作者 [autotrust](https://huggingface.co/autotrust)**（Apache 2.0）。我们复现了它们的训练配方（LoRA 的挂载位置和秩、24 位决策头及其初始化、KL + RPS 损失、选项打乱、分层批次、优化器和学习率调度），沿用它们的 `bare-v1` 提示词模板和 verbalizer token id、"把决策头表示成 lm_head 上的 LoRA"的部署做法、它们 `serve_decide.py` 的 `/v1/decide` 接口格式，并以它们公开的数字作为目标。[JEV-27B-VL](https://huggingface.co/autotrust/JEV-27B-VL) 的模型卡和 [JEV-27B-DEMO](https://github.com/yuhai-china/JEV-27B-DEMO) 仓库提供了 VL-RewardBench 的评测协议和我们评测时使用的客户端。
 
-Bonsai-JEV-27B 就是把 JEV 的配方用在 Bonsai 2 底座上；两部分思路的功劳都属于各自的作者。
+Bonsai-JEV 就是把 JEV 的配方用在 Bonsai 2 底座上；两部分思路的功劳都属于各自的作者。
 
 > **状态（2026-10-14）：训练进行中。** 下面是验证集 KL；测试集数字、发布的适配器和看图评测在训练结束后补上。标 *待测* 的还没有测。
 
@@ -33,7 +33,7 @@ KL(目标 ‖ 模型)，越低越好，按类型温度校准后。"Jev 标注的
 | Bonsai 2 27B 零样本（无适配器，直接读字母 logits） | 0.443 | 0.481 | 0.167 | 0.724 | 0.595 |
 | JEV-9B（公开） | 0.019 | 0.021 | 0.005 | 0.023 | 0.028 |
 | JEV-27B（公开） | 0.017 | 0.019 | | | |
-| **Bonsai-JEV-27B** | *待测* | *待测* | *待测* | *待测* | *待测* |
+| **Bonsai-JEV** | *待测* | *待测* | *待测* | *待测* | *待测* |
 
 \* 我们的"全部"去掉了 2,260 行标签为占位 `[0.5, 0.5]` 的 `yuri_v1`；JEV 的包含它们。
 
@@ -53,7 +53,7 @@ KL(目标 ‖ 模型)，越低越好，按类型温度校准后。"Jev 标注的
 | Bonsai 2 27B 零样本 | 60.2 | 78.9 | 72.2 | 74.5 | 50.9% |
 | JEV-9B（公开） | | | | 74.3 | |
 | JEV-27B-VL（公开） | 58.0 | 83.2 | 78.2 | 78.3 | 89% |
-| **Bonsai-JEV-27B** | *待测* | *待测* | *待测* | *待测* | *待测* |
+| **Bonsai-JEV** | *待测* | *待测* | *待测* | *待测* | *待测* |
 
 顺序一致率是把两个回答换位后结论不变的比例。三值底座单看任一种顺序接近抛硬币，平均分把这一点掩盖了，所以每个模型都报这一列。
 
@@ -73,14 +73,14 @@ KL(目标 ‖ 模型)，越低越好，按类型温度校准后。"Jev 标注的
 
 需要从源码带 CUDA 编译 [PrismML 的 llama.cpp 分支](https://github.com/PrismML-Eng/llama.cpp)（原版 llama.cpp 加载不了 PQ2_0；在 Zen 4 等 AVX-512 CPU 上，发布的二进制一加载就崩，见模型的 KNOWN_ISSUES）。
 
-推理所需的全部文件（底座 GGUF、视觉投影、适配器、校准）都在同一个模型仓库里，[Hugging Face](https://huggingface.co/dakebakery/Bonsai-JEV-27B) 和 [ModelScope](https://modelscope.cn/models/dakepeng/Bonsai-JEV-27B) 同步发布（发布时上传）。底座就是 Prism ML 的原文件，和适配器验证时用的那份逐字节一致。
+推理所需的全部文件（底座 GGUF、视觉投影、适配器、校准）都在同一个模型仓库里，[Hugging Face](https://huggingface.co/dakebakery/Bonsai-JEV) 和 [ModelScope](https://modelscope.cn/models/dakepeng/Bonsai-JEV) 同步发布（发布时上传）。底座就是 Prism ML 的原文件，和适配器验证时用的那份逐字节一致。
 
 ```bash
 # 约 8.7 GB，两个来源任选：
-modelscope download --model dakepeng/Bonsai-JEV-27B --local_dir ~/bonsai/Bonsai-JEV-27B     # 国内推荐
-huggingface-cli download dakebakery/Bonsai-JEV-27B --local-dir ~/bonsai/Bonsai-JEV-27B
+modelscope download --model dakepeng/Bonsai-JEV --local_dir ~/bonsai/Bonsai-JEV-weights     # 国内推荐
+huggingface-cli download dakebakery/Bonsai-JEV --local-dir ~/bonsai/Bonsai-JEV-weights
 # 启动 llama-server 和 /v1/decide 封装
-bash run_decide.sh start ~/bonsai/Bonsai-JEV-27B
+bash run_decide.sh start ~/bonsai/Bonsai-JEV-weights
 ```
 
 ```bash
