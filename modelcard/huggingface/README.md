@@ -27,6 +27,8 @@ tags:
 
 **A calibrated, image-capable 27B decision model that fits on an 8 GB GPU.** The [JEV](https://huggingface.co/autotrust/JEV-27B) recipe (a LoRA plus a 24-slot decision head, distilled to soft labels) trained on [Ternary Bonsai 2 27B](https://huggingface.co/prism-ml/Ternary-Bonsai-2-27B-gguf), Prism ML's ternary compression of Qwen3.8-27B. Ask a typed question (yes/no, 0–5 score, or 2–16-way choice) about a state that can include images; one forward pass returns calibrated probabilities over the options. No text is generated.
 
+**Code, training recipe and evaluation scripts:** [github.com/DakePeng/Bonsai-JEV](https://github.com/DakePeng/Bonsai-JEV) · Mirror: [ModelScope](https://modelscope.cn/models/dakepeng/Bonsai-JEV)
+
 The same weights also serve **System 2**: with the adapter switched off, the server is Ternary Bonsai 2 itself, byte for byte.
 
 > **Status (2026-10-15):** trained; all numbers below are measured through the deployment path (the fork running `adapter.gguf` on the ternary file). JevBench-231, the agent-judge benchmarks and the Decision Index run are pending.
