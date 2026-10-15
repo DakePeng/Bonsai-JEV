@@ -8,7 +8,7 @@
 |---|---|---|
 | Base | Qwen3.8-27B, BF16 | Ternary Bonsai 2 27B, PQ2_0 (2.13 bpw) |
 | Weights in memory | ~54 GB (vLLM, one 80 GB GPU) | **5.95 GB** base (PTQ1_0) + 0.6 GB vision + 0.23 GB fp16 adapter; or 7.2 GB base (PQ2_0) + 0.46 GB adapter |
-| Runs on | H100 / B200 | **8 GB GPU** with PTQ1_0 (~7.1 GiB peak with vision and 4k context; simulated by capping an RTX 4070 at 7.5 GiB); RTX 4070 12 GB (tested); Jetson Orin NX 16 GB and Apple Silicon via the fork (not yet tested with the adapter) |
+| Runs on | H100 / B200 | **8 GB GPU** with PTQ1_0 (~7.1 GiB peak with vision and 4k context; simulated by capping an RTX 4070 at 7.5 GiB); RTX 4070 12 GB (tested); Apple Silicon 16 GB via MLX (Mac mini M4 tested, Prism's MLX 2-bit pack); AMD Radeon 780M iGPU via Vulkan (tested); Jetson Orin NX 16 GB not yet tested |
 | Trainable | 108.8M LoRA + 123k head | same recipe, same shapes |
 
 > **Independent project.** Bonsai-JEV is built by an independent developer. It is not affiliated with, endorsed by, or sponsored by AutoTrust (autotrust), TypeSafe, or Prism ML. Their names appear only to credit their work and to identify the models and data this project builds on; all trademarks belong to their owners.
@@ -91,6 +91,24 @@ One forward pass without averaging: 77.5 (as given) / 79.1 (swapped). 78.0 vs 78
 
 Both models are zero-shot on these tasks. Our probabilities rank completed vs failed trajectories slightly better (AUROC); at the fixed 0.5 threshold they trade 3.7 points of precision for 4.5 of recall, so pick the threshold for your use. On the 4070 one AgentRewardBench decision takes p50 3.6 s at ~2,800 prompt tokens.
 
+### Embodied reasoning ([ERQA](https://github.com/embodiedreasoning/ERQA), 400 questions, 1–6 images)
+
+Google DeepMind's robot-scene benchmark (released with Gemini Robotics). Same protocol as the JEV-35B card: each question is one `choice` decision through `/v1/decide`, options as given, most probable option wins, one pass (System 1 only). Images go into the state in order, capped at 1.6 MP (`erqa_eval.py`). No robot or embodied data in training, for any model below. Chance ≈ 26%; the 95% interval at 400 questions is about ±5 points.
+
+| type | n | **Bonsai-JEV** | JEV-35B (published) |
+|---|---:|---:|---:|
+| **All** | 400 | **52.0** | 51.3 |
+| Spatial reasoning | 84 | 52.4 | 44.0 |
+| Action reasoning | 72 | 56.9 | 54.2 |
+| Trajectory reasoning | 66 | 50.0 | 59.1 |
+| State estimation | 55 | 61.8 | 56.4 |
+| Task reasoning | 38 | 52.6 | 50.0 |
+| Multi-view reasoning | 37 | 29.7 | 40.5 |
+| Pointing | 34 | 64.7 | 64.7 |
+| Other | 14 | 21.4 | 21.4 |
+
+JEV-27B-VL (published): 53.8 one pass, 61.5 with thinking. Ours is 56.1% on single-image questions and 41.6% on the 113 multi-image ones; cross-view correspondence is the weak spot. 4070: p50 1.6 s per question.
+
 ### JevBench-231 (top-1 accuracy, bonjev's grading)
 
 | Model | prompt | correct |
@@ -126,6 +144,21 @@ Order-agree is the share of pairs whose verdict survives swapping the two answer
 **Concurrency:** 40 concurrent decisions over 8 slots match sequential ones (max |Δp| 0.0035, no flips), with 8 chat requests mixed in (identical text, no adapter leakage). The fork batches only requests with the same LoRA set, so JEV-27B-VL's vLLM limit of 8 sequences does not apply.
 
 Max context on 12 GB: ~24–32k tokens with f16 KV, ~48–60k with q8_0 KV (only 16 of 64 layers keep a KV cache; the 48 linear-attention layers hold a fixed ~150 MB state per slot).
+
+### Other devices
+
+| | Mac mini M4, 16 GB (MLX) | Ryzen 7 8745H + Radeon 780M iGPU (Vulkan) |
+|---|---|---|
+| How | Prism's [MLX 2-bit pack](https://huggingface.co/prism-ml/Ternary-Bonsai-2-27B-mlx-2bit) + our peft LoRA and head, no conversion (`mlx_decide.py`, `mlx_serve.py`) | PTQ1_0 + `adapter_f16.gguf` on the fork's Vulkan backend, `CACHE_RAM=2048` |
+| Agreement with the 4070 (CUDA) | text: KL 0.00000, top-1 100% on 300 rows; images: same verdict on 96.3% of 82 VL-RewardBench prompts, mean \|Δp\| 0.014 (different image resizing) | same weights and runtime as the 4070 path |
+| Memory | 8.6 GiB peak (text), 9.7 GiB with images | ~7.7 GB of iGPU memory (VRAM 2.96 + GTT 4.74 GB); 2.7 GB process RSS |
+| Prompt processing | — | 54 tok/s (`llama-bench` pp512) |
+| Service start | 5–6 s | 8 s |
+| Text decision, new state (~83 tokens) | p50 2.1 s, p95 4.3 s | p50 4.3 s, p95 6.5 s |
+| Image + two answers, new image | p50 13.8 s (~620 tokens) | p50 13.3 s (~430 tokens) |
+| Warming a scene / each follow-up | — | 11.0 s once / 2.9 s |
+
+Decisions need only prompt processing (one forward pass, the next-token logits at `[decision]:`); generation speed only matters for System 2 chat. On shared-memory iGPUs set `CACHE_RAM` low: with the default 16 GiB prompt cache the 780M box peaked at 27.9 of 28 GB system RAM.
 
 ## Quickstart (serving)
 
@@ -202,6 +235,8 @@ LoRA r=16, α=32, dropout 0.05 on `in_proj_qkv, in_proj_z, out_proj, q/k/v/o_pro
 | `infer_logits.py`, `calibrate.py`, `eval_text.py` | 24-slot logits, per-kind temperature (L-BFGS), KL/accuracy/ECE |
 | `export_gguf_lora.py` | peft checkpoint → one GGUF LoRA for the fork + `decision.json` |
 | `decide_server.py`, `run_decide.sh` | `/v1/decide` and `/v1/warm` over `llama-server` |
+| `mlx_decide.py`, `mlx_serve.py` | the same decisions and `/v1/decide` API on Apple Silicon, on Prism's MLX 2-bit pack |
+| `erqa_eval.py`, `agent_judge_eval.py`, `jevbench_eval.py`, `edge_bench.py`, `di_engine.py` | benchmark harnesses and the edge latency/memory probe |
 | `zeroshot_text.py`, `zeroshot_vlrb.py` | zero-shot baselines; JEV's bare-v1 prompt and verbalizer ids |
 | `tools/dump-tensors`, `tools/decide-logits`, `tools/decide-logits-mm` | small llama.cpp examples (copy into the fork's `examples/`) |
 | `align_layer.py`, `align_inner.py`, `test_export.py`, `check_export_real.py`, `test_decide.py`, `test_system2.py` | numerical checks |

@@ -48,7 +48,7 @@ The same weights also serve **System 2**: with the adapter switched off, the ser
 |---|---|---|
 | Base | Qwen3.8-27B, BF16 | Ternary Bonsai 2 27B, PQ2_0 (2.13 bits/weight) |
 | Download | ~54 / ~56 GB | **~8.7 GB** (PQ2_0) or ~7.4 GB (PTQ1_0) |
-| Runs on | one 80 GB+ GPU (vLLM) | **8 GB GPU** with PTQ1_0 (~7.1 GiB peak incl. vision, 4k context; simulated on an RTX 4070 capped at 7.5 GiB); 12 GB GPU (RTX 4070 tested); Jetson Orin NX 16 GB and Apple Silicon via the fork (not yet tested with the adapter) |
+| Runs on | one 80 GB+ GPU (vLLM) | **8 GB GPU** with PTQ1_0 (~7.1 GiB peak incl. vision, 4k context; simulated on an RTX 4070 capped at 7.5 GiB); 12 GB GPU (RTX 4070 tested); Apple Silicon 16 GB via MLX (Mac mini M4 tested, Prism's MLX 2-bit pack); AMD Radeon 780M iGPU via Vulkan (tested); Jetson Orin NX 16 GB not yet tested |
 | Trainable parameters | 108.8M LoRA + 123k head | same recipe, same shapes |
 | Images | zero-shot | zero-shot |
 | System 2 | unmodified Qwen3.8-27B | unmodified Ternary Bonsai 2 27B |
@@ -90,6 +90,8 @@ A tie with JEV-27B-VL (±2.4 at 1,247 pairs). One forward pass without averaging
 
 Order-agree is the share of pairs whose verdict survives swapping the two answers; it shows whether a single forward pass can be trusted.
 
+**Embodied reasoning**, [ERQA](https://github.com/embodiedreasoning/ERQA) (400 robot-scene questions, one pass, JEV-35B protocol): **52.0** (JEV-27B-VL 53.8, JEV-35B 51.3; chance ≈ 26, ±5 at 400 questions); 56.1 on single-image and 41.6 on multi-image questions.
+
 **Agent judges** (zero-shot, JEV-27B-DEMO prompts): AgentRewardBench AUROC **0.930** (JEV-27B-VL 0.91), precision / recall at 0.5 74.7 / 74.7 (78.4 / 70.2); Plan-RewardBench macro accuracy **74.7** (73.2). **[JevBench-231](https://github.com/fstandhartinger/jevbench)**: 194 / 231 with JEV's `bare-v1` prompt, +28 over the zero-shot base with the same prompt.
 
 **Speed and memory**, RTX 4070 12 GB, PrismML llama.cpp fork:
@@ -105,6 +107,8 @@ Order-agree is the share of pairs whose verdict survives swapping the two answer
 | Max context on 12 GB | ~24–32k tokens (f16 KV), ~48–60k (q8_0 KV) |
 
 **PTQ1_0** runs the same adapter with identical decisions (100% top-1 agreement, zero probability difference on 3,000 rows) and is faster. **Concurrency:** 40 concurrent decisions over 8 slots match sequential ones (max |Δp| 0.0035, no flips; mixed chat unaffected); the fork batches only requests with the same LoRA set.
+
+**Other devices.** *Mac mini M4 16 GB (MLX):* Prism's [MLX 2-bit pack](https://huggingface.co/prism-ml/Ternary-Bonsai-2-27B-mlx-2bit) with this repo's `peft/` and `head.safetensors`, no conversion (`mlx_serve.py` on GitHub); identical to the CUDA path on text (KL 0.00000 on 300 rows), 96.3% same verdict on images; 8.6–9.7 GiB; text p50 2.1 s, image p50 13.8 s. *Radeon 780M iGPU (Vulkan):* PTQ1_0 + fp16 adapter, ~7.7 GB of iGPU memory, prompt processing 54 tok/s; text p50 4.3 s, image p50 13.3 s, follow-up on a warmed scene 2.9 s.
 
 ## Quickstart
 

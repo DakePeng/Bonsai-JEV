@@ -8,7 +8,7 @@
 |---|---|---|
 | 底座 | Qwen3.8-27B，BF16 | Ternary Bonsai 2 27B，PQ2_0（2.13 bit/权重） |
 | 显存中的权重 | 约 54 GB（vLLM，一张 80 GB 卡） | **5.95 GB** 底座（PTQ1_0）+ 0.6 GB 视觉 + 0.23 GB fp16 适配器；或 7.2 GB 底座（PQ2_0）+ 0.46 GB 适配器 |
-| 能跑在 | H100 / B200 | **8 GB 显卡**，用 PTQ1_0（带视觉和 4k 上下文峰值约 7.1 GiB；在 RTX 4070 上把显存限制到 7.5 GiB 模拟）；RTX 4070 12 GB（已测）；Jetson Orin NX 16 GB 和 Apple Silicon 走分支的后端（尚未带适配器测试） |
+| 能跑在 | H100 / B200 | **8 GB 显卡**，用 PTQ1_0（带视觉和 4k 上下文峰值约 7.1 GiB；在 RTX 4070 上把显存限制到 7.5 GiB 模拟）；RTX 4070 12 GB（已测）；16 GB 的 Apple Silicon 走 MLX（Mac mini M4 已测，用 Prism 的 MLX 2-bit 包）；AMD Radeon 780M 核显走 Vulkan（已测）；Jetson Orin NX 16 GB 尚未测试 |
 | 训练参数 | 1.088 亿 LoRA + 12.3 万决策头 | 同一配方、同样的形状 |
 
 > **独立项目。** Bonsai-JEV 由一位独立开发者完成，与 AutoTrust（autotrust）、TypeSafe、Prism ML 均无隶属关系，也未获得它们的认可或赞助。文中提到它们的名字，只是为了致谢和注明本项目所基于的模型与数据；相关商标归各自所有者。
@@ -91,6 +91,24 @@ JEV-27B 模型卡上的其他指标，同样的行、同样的定义（`kl_break
 
 两个模型在这些任务上都是零样本。我们的概率在区分"完成 / 失败"上排序略好（AUROC 更高）；固定阈值 0.5 时用 3.7 个点的精确率换了 4.5 个点的召回率，实际使用时按需要选阈值。4070 上一次 AgentRewardBench 决策 p50 3.6 秒，约 2,800 个输入 token。
 
+### 具身推理（[ERQA](https://github.com/embodiedreasoning/ERQA)，400 题，每题 1–6 张图）
+
+Google DeepMind 随 Gemini Robotics 发布的机器人场景基准。协议和 JEV-35B 模型卡相同：每题是一次 `choice` 决策，走 `/v1/decide`，选项照原样，取概率最高的选项，单次前向（只用 System 1）。多张图按顺序放进 state，单张上限 1.6 MP（`erqa_eval.py`）。下表所有模型的训练里都没有机器人或具身数据。随机猜约 26%，400 题的 95% 置信区间约 ±5 个点。
+
+| 题型 | 题数 | **Bonsai-JEV** | JEV-35B（公开） |
+|---|---:|---:|---:|
+| **全部** | 400 | **52.0** | 51.3 |
+| 空间推理 | 84 | 52.4 | 44.0 |
+| 动作推理 | 72 | 56.9 | 54.2 |
+| 轨迹推理 | 66 | 50.0 | 59.1 |
+| 状态判断 | 55 | 61.8 | 56.4 |
+| 任务是否完成 | 38 | 52.6 | 50.0 |
+| 多视角推理 | 37 | 29.7 | 40.5 |
+| 指点定位 | 34 | 64.7 | 64.7 |
+| 其他 | 14 | 21.4 | 21.4 |
+
+JEV-27B-VL（公开）：单次前向 53.8，打开思考 61.5。我们单图题 56.1%，113 道多图题 41.6%，跨视角对应是弱项。4070 上每题 p50 1.6 秒。
+
 ### JevBench-231（top-1 准确率，按 bonjev 的判分方式）
 
 | 模型 | 提示词 | 答对 |
@@ -126,6 +144,21 @@ JEV-27B 模型卡上的其他指标，同样的行、同样的定义（`kl_break
 **并发：** 8 个槽位上 40 个并发决策和逐个发的结果一致（最大概率差 0.0035，没有翻转）；同时混入 8 个聊天请求，文本一致，适配器没有串到聊天。分支只把 LoRA 配置相同的请求放进同一批，所以 JEV-27B-VL 在 vLLM 上"最多 8 个序列"的限制对这里不适用。
 
 12 GB 能开的上下文：f16 KV 约 2.4–3.2 万 token，q8_0 KV 约 4.8–6 万（64 层里只有 16 层有 KV cache；48 层线性注意力每个并发槽位固定约 150 MB 状态）。
+
+### 其他设备
+
+| | Mac mini M4，16 GB（MLX） | Ryzen 7 8745H + Radeon 780M 核显（Vulkan） |
+|---|---|---|
+| 做法 | Prism 的 [MLX 2-bit 包](https://huggingface.co/prism-ml/Ternary-Bonsai-2-27B-mlx-2bit) + 我们的 peft LoRA 和决策头，不需要转换（`mlx_decide.py`、`mlx_serve.py`） | PTQ1_0 + `adapter_f16.gguf`，走分支的 Vulkan 后端，`CACHE_RAM=2048` |
+| 和 4070（CUDA）的一致性 | 文本：300 行上 KL 0.00000，top-1 100%；看图：82 条 VL-RewardBench 提示中 96.3% 判断一致，平均 \|Δp\| 0.014（图片缩放方式不同） | 和 4070 是同一套权重和运行时 |
+| 内存 | 文本峰值 8.6 GiB，看图 9.7 GiB | 核显内存约 7.7 GB（显存 2.96 + GTT 4.74 GB）；进程 RSS 2.7 GB |
+| 预填充速度 | — | 54 token/秒（`llama-bench` pp512） |
+| 服务启动 | 5–6 秒 | 8 秒 |
+| 文本决策，新状态（约 83 token） | p50 2.1 秒，p95 4.3 秒 | p50 4.3 秒，p95 6.5 秒 |
+| 一张图 + 两段回答，新图 | p50 13.8 秒（约 620 token） | p50 13.3 秒（约 430 token） |
+| 预热一个场景 / 之后每次追问 | — | 一次 11.0 秒 / 2.9 秒 |
+
+做决策只需要预填充（一次前向，读 `[decision]:` 处下一个 token 的 logits）；生成速度只对 System 2 聊天有意义。共享内存的核显上要把 `CACHE_RAM` 调小：用默认的 16 GiB 提示词缓存时，780M 那台机器的系统内存峰值到了 28 GB 中的 27.9 GB。
 
 ## 快速上手（推理服务）
 
@@ -202,6 +235,8 @@ LoRA r=16、α=32、dropout 0.05，挂在全部 64 层的 `in_proj_qkv, in_proj_
 | `infer_logits.py`、`calibrate.py`、`eval_text.py` | 24 位 logits、按类型温度（L-BFGS）、KL/准确率/ECE |
 | `export_gguf_lora.py` | peft checkpoint → 分支用的单个 GGUF LoRA + `decision.json` |
 | `decide_server.py`、`run_decide.sh` | 套在 `llama-server` 上的 `/v1/decide` 和 `/v1/warm` |
+| `mlx_decide.py`、`mlx_serve.py` | 在 Apple Silicon 上用 Prism 的 MLX 2-bit 包做同样的决策，提供同样的 `/v1/decide` 接口 |
+| `erqa_eval.py`、`agent_judge_eval.py`、`jevbench_eval.py`、`edge_bench.py`、`di_engine.py` | 各项基准的评测脚本，以及边缘设备的延迟和内存测试 |
 | `zeroshot_text.py`、`zeroshot_vlrb.py` | 零样本基线；JEV 的 bare-v1 提示词和 verbalizer id |
 | `tools/dump-tensors`、`tools/decide-logits`、`tools/decide-logits-mm` | llama.cpp 小工具（拷进分支的 `examples/`） |
 | `align_layer.py`、`align_inner.py`、`test_export.py`、`check_export_real.py`、`test_decide.py`、`test_system2.py` | 数值检查 |

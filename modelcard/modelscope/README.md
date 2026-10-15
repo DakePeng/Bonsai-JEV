@@ -47,7 +47,7 @@ tags:
 |---|---|---|
 | 底座 | Qwen3.8-27B，BF16 | Ternary Bonsai 2 27B，PQ2_0（2.13 bit/权重） |
 | 下载大小 | 约 54 / 56 GB | **约 8.7 GB**（PQ2_0）或约 7.4 GB（PTQ1_0） |
-| 能跑在 | 一张 80 GB 以上的卡（vLLM） | **8 GB 显卡**，用 PTQ1_0（带视觉和 4k 上下文峰值约 7.1 GiB；在 RTX 4070 上把显存限制到 7.5 GiB 模拟）；12 GB 显卡（RTX 4070 已测）；Jetson Orin NX 16 GB 和 Apple Silicon 走分支的后端（尚未带适配器测试） |
+| 能跑在 | 一张 80 GB 以上的卡（vLLM） | **8 GB 显卡**，用 PTQ1_0（带视觉和 4k 上下文峰值约 7.1 GiB；在 RTX 4070 上把显存限制到 7.5 GiB 模拟）；12 GB 显卡（RTX 4070 已测）；16 GB 的 Apple Silicon 走 MLX（Mac mini M4 已测，用 Prism 的 MLX 2-bit 包）；AMD Radeon 780M 核显走 Vulkan（已测）；Jetson Orin NX 16 GB 尚未测试 |
 | 训练参数 | 1.088 亿 LoRA + 12.3 万决策头 | 同一配方、同样的形状 |
 | 看图 | 零样本 | 零样本 |
 | System 2 | 未改动的 Qwen3.8-27B | 未改动的 Ternary Bonsai 2 27B |
@@ -89,6 +89,8 @@ JEV-27B 模型卡上的其他指标，同样的行、同样的定义：
 
 顺序一致率是把两个回答换位后结论不变的比例，反映单次前向的结果是否可信。
 
+**具身推理**，[ERQA](https://github.com/embodiedreasoning/ERQA)（400 道机器人场景题，单次前向，JEV-35B 的协议）：**52.0**（JEV-27B-VL 53.8，JEV-35B 51.3；随机约 26，400 题置信区间约 ±5）；单图题 56.1，多图题 41.6。
+
 **Agent 评判**（零样本，JEV-27B-DEMO 的提示词）：AgentRewardBench AUROC **0.930**（JEV-27B-VL 0.91），阈值 0.5 时精确率 / 召回率 74.7 / 74.7（78.4 / 70.2）；Plan-RewardBench 宏平均准确率 **74.7**（73.2）。**[JevBench-231](https://github.com/fstandhartinger/jevbench)**：用 JEV 的 `bare-v1` 提示词答对 194 / 231，比同一提示词下的零样本底座多 28 题。
 
 **速度和显存**，RTX 4070 12 GB，PrismML 的 llama.cpp 分支：
@@ -104,6 +106,8 @@ JEV-27B 模型卡上的其他指标，同样的行、同样的定义：
 | 12 GB 上的最大上下文 | 约 2.4–3.2 万 token（f16 KV），约 4.8–6 万（q8_0 KV） |
 
 **PTQ1_0** 挂同一个适配器，决策完全一致（3,000 行上 top-1 一致率 100%，概率差为 0），而且更快。**并发：** 8 个槽位上 40 个并发决策和逐个发的结果一致（最大概率差 0.0035，没有翻转；混入的聊天不受影响）；分支只把 LoRA 配置相同的请求放进同一批。
+
+**其他设备。** *Mac mini M4 16 GB（MLX）：* Prism 的 [MLX 2-bit 包](https://huggingface.co/prism-ml/Ternary-Bonsai-2-27B-mlx-2bit) 加本仓库的 `peft/` 和 `head.safetensors`，不需要转换（GitHub 上的 `mlx_serve.py`）；文本和 CUDA 路径完全一致（300 行上 KL 0.00000），看图 96.3% 判断一致；内存 8.6–9.7 GiB；文本 p50 2.1 秒，看图 p50 13.8 秒。*Radeon 780M 核显（Vulkan）：* PTQ1_0 + fp16 适配器，核显内存约 7.7 GB，预填充 54 token/秒；文本 p50 4.3 秒，看图 p50 13.3 秒，场景预热后追问 2.9 秒。
 
 ## 快速上手
 
