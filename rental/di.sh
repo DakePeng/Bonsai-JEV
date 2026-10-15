@@ -13,7 +13,7 @@ DATA=${DATA_DISK:-$HOME/autodl-tmp}; [ -d "$DATA" ] || DATA=$HOME
 [ -e ~/bonsai ] || { mkdir -p $DATA/bonsai && ln -s $DATA/bonsai ~/bonsai; }
 R=~/bonsai; DI=$R/di; W=$R/weights; J=$R/jev
 MIRROR=${PIP_MIRROR:-https://repo.huaweicloud.com/repository/pypi/simple}
-export PIP_NO_CACHE_DIR=1 LLAMA_BIN=$R/llama.cpp/build/bin VENV=$R/venv-di
+export PIP_NO_CACHE_DIR=1 LLAMA_BIN=$R/llama.cpp/build/bin VENV=$R/venv-di PATH=/usr/local/cuda/bin:/root/miniconda3/bin:$PATH
 log() { echo "[$(date +%H:%M:%S)] $*"; }
 
 case "${1:-}" in
@@ -29,9 +29,13 @@ setup)
     cmake --build $R/llama.cpp/build --target llama-server -j "$(nproc)" > $R/build.log 2>&1
   fi
   mkdir -p $W
-  for f in Ternary-Bonsai-2-27B-PQ2_0.gguf Ternary-Bonsai-2-27B-mmproj-Q8_0.gguf adapter.gguf; do
-    bash $J/rental/msdl.sh dakepeng/Bonsai-JEV $f $W/$f 16
+  for f in Ternary-Bonsai-2-27B-PQ2_0.gguf Ternary-Bonsai-2-27B-mmproj-Q8_0.gguf; do   # Prism's files, same bytes as the release
+    [ -f $R/models/bonsai2-27b/$f ] && [ ! -e $W/$f ] && ln -s $R/models/bonsai2-27b/$f $W/$f
   done
+  for f in Ternary-Bonsai-2-27B-PQ2_0.gguf Ternary-Bonsai-2-27B-mmproj-Q8_0.gguf adapter.gguf; do
+    [ -e $W/$f ] || bash $J/rental/msdl.sh dakepeng/Bonsai-JEV $f $W/$f 16
+  done
+  (cd $W && sha256sum -L Ternary-Bonsai-2-27B-PQ2_0.gguf Ternary-Bonsai-2-27B-mmproj-Q8_0.gguf adapter.gguf)
   [ -f $W/decision.json ] || curl -sL -o $W/decision.json "https://www.modelscope.cn/api/v1/models/dakepeng/Bonsai-JEV/repo?Revision=master&FilePath=decision.json"
   python3 -c "import json; d=json.load(open('$W/decision.json')); print('temperatures', d['per_kind_temperature'])"
   $LLAMA_BIN/llama-server --version 2>&1 | tail -1
