@@ -33,7 +33,7 @@ tags:
 
 The same weights also serve **System 2**: with the adapter switched off, the server is Ternary Bonsai 2 itself, byte for byte.
 
-> **Status (2026-10-15):** trained; all numbers below are measured through the deployment path (the fork running `adapter.gguf` on the ternary file). JevBench-231, the agent-judge benchmarks and the Decision Index run are pending.
+> **Status (2026-10-15):** trained; all numbers below are measured through the deployment path (the fork running `adapter.gguf` on the ternary file). The Decision Index run is pending.
 
 > **Independent project.** Bonsai-JEV is built by an independent developer. It is not affiliated with, endorsed by, or sponsored by AutoTrust (autotrust), TypeSafe, or Prism ML. Their names appear only to credit their work and to identify the models and data this project builds on; all trademarks belong to their owners.
 
@@ -74,7 +74,7 @@ The other JEV-27B card metrics, same rows and definitions:
 | Rating error (MAE of the expected 0–5 rating) | 0.098 | 0.097 |
 | KL to ground truth, unseen task families | **0.104** | 0.128 |
 | Top-1 accuracy, unseen task families | 0.942 | 0.948 |
-| Choice top-1 flips when the options are reversed | — | 4.3% |
+| Choice top-1 flips when the options are shuffled / reversed | 2.9% / — | 3.4% / 4.3% |
 
 Fitted temperatures 1.014 / 1.014 / 1.012 (noul / score / choice): the model is calibrated by training. Validation KL fell from 0.070 at step 250 to 0.018 at step 4,000, flat over the last 250 steps.
 
@@ -90,6 +90,8 @@ A tie with JEV-27B-VL (±2.4 at 1,247 pairs). One forward pass without averaging
 
 Order-agree is the share of pairs whose verdict survives swapping the two answers; it shows whether a single forward pass can be trusted.
 
+**Agent judges** (zero-shot, JEV-27B-DEMO prompts): AgentRewardBench AUROC **0.930** (JEV-27B-VL 0.91), precision / recall at 0.5 74.7 / 74.7 (78.4 / 70.2); Plan-RewardBench macro accuracy **74.7** (73.2). **[JevBench-231](https://github.com/fstandhartinger/jevbench)**: 194 / 231 with JEV's `bare-v1` prompt, +28 over the zero-shot base with the same prompt.
+
 **Speed and memory**, RTX 4070 12 GB, PrismML llama.cpp fork:
 
 | | |
@@ -98,7 +100,7 @@ Order-agree is the share of pairs whose verdict survives swapping the two answer
 | Peak VRAM (PQ2_0 + vision + 4k context) | 9.17 GB |
 | `/v1/decide` end to end: text / image + two answers, cold (p50) | 0.62 s / 0.99 s |
 | Follow-up question on a warmed scene (p50) | 0.23 s |
-| 8 GB card: PTQ1_0 + fp16 adapter + vision, 4k context, VRAM capped at 7.5 GiB | text 0.42 s, image 1.04 s (p50), ~7.1 GiB used |
+| 8 GB card: PTQ1_0 + fp16 adapter + vision, 4k context, VRAM capped at 7.5 GiB | text 0.42 s, image 1.04 s (p50), ~7.1 GiB used; vision on the CPU (`MMPROJ=cpu`): ~6.3 GiB, image 3.4 s |
 | Max context on 12 GB | ~24–32k tokens (f16 KV), ~48–60k (q8_0 KV) |
 
 **PTQ1_0** runs the same adapter with identical decisions (100% top-1 agreement, zero probability difference on 3,000 rows) and is faster. **Concurrency:** 40 concurrent decisions over 8 slots match sequential ones (max |Δp| 0.0035, no flips; mixed chat unaffected); the fork batches only requests with the same LoRA set.

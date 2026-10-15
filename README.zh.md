@@ -24,7 +24,7 @@ Bonsai-JEV 就是把 JEV 的配方用在 Bonsai 2 底座上；两部分思路的
 
 另外感谢 **ChezRD 的 [bonjev](https://github.com/ChezRD/bonjev)**（MIT），一条更早的、不训练的 Ternary Bonsai 决策路线：一个基于 Prism llama.cpp 库的 Rust 引擎，把现成的决策 LoRA 增量组合起来。它公开的 [JevBench-231](https://github.com/fstandhartinger/jevbench) 和 Decision Index 评测协议与成绩，是我们对照的外部基准（`jevbench_eval.py` 的判分方式和它的考试完全一致）。
 
-> **状态（2026-10-15）：已训练完成，并在部署路径（分支 + 三值底座上的 `adapter.gguf`）上评测完毕。** JevBench-231、agent-judge 两项和 Decision Index 还没跑完（标 *待测*）。
+> **状态（2026-10-15）：已训练完成，并在部署路径（分支 + 三值底座上的 `adapter.gguf`）上评测完毕。** Decision Index 还没跑。
 
 ## 结果
 
@@ -53,6 +53,7 @@ JEV-27B 模型卡上的其他指标，同样的行、同样的定义（`kl_break
 | 拟合温度 noul / score / choice | 1.014 / 1.004 / 1.016 | 1.014 / 1.014 / 1.012 |
 | 对真实标签的 KL，没见过的任务族（`ood`） | **0.104** | 0.128 |
 | top-1 准确率，没见过的任务族 | 0.942 | **0.948** |
+| 选项打乱后选择题 top-1 翻转的比例 | 2.9% | 3.4% |
 | 选项倒序后选择题 top-1 翻转的比例 | — | 4.3%（零样本底座 65.7%） |
 
 † 我们的 ECE 是把每个选项的预测概率分箱，和目标概率比；JEV 卡没有进一步说明它的 ECE 定义，两者只作参考。
@@ -79,6 +80,17 @@ JEV-27B 模型卡上的其他指标，同样的行、同样的定义（`kl_break
 
 不取平均、只做一次前向：77.5（原顺序）/ 79.1（换位）。78.0 对 78.3 落在 1,247 对的 ±2.4 置信区间以内，算持平。三值底座在 reasoning 上掉了 4.1 分，hallucination 上高 1.7 分。
 
+### Agent 评判（JEV-27B-DEMO 的提示词，走 `/v1/decide`）
+
+| | JEV-27B-VL（公开） | **Bonsai-JEV** |
+|---|---:|---:|
+| [AgentRewardBench](https://huggingface.co/datasets/McGill-NLP/agent-reward-bench)，1,302 条网页 agent 轨迹，带最后一张截图判断任务是否完成：AUROC | 0.91 | **0.930** |
+| 同上，阈值 0.5 时的精确率 / 召回率 | 78.4 / 70.2 | 74.7 / 74.7 |
+| 同上，不带截图：AUROC | — | 0.922 |
+| [Plan-RewardBench](https://huggingface.co/datasets/wyy1112/Plan-RewardBench)，1,171 对轨迹，两种顺序取平均的宏平均准确率 | 73.2 | **74.7** |
+
+两个模型在这些任务上都是零样本。我们的概率在区分"完成 / 失败"上排序略好（AUROC 更高）；固定阈值 0.5 时用 3.7 个点的精确率换了 4.5 个点的召回率，实际使用时按需要选阈值。4070 上一次 AgentRewardBench 决策 p50 3.6 秒，约 2,800 个输入 token。
+
 ### JevBench-231（top-1 准确率，按 bonjev 的判分方式）
 
 | 模型 | 提示词 | 答对 |
@@ -86,7 +98,9 @@ JEV-27B 模型卡上的其他指标，同样的行、同样的定义（`kl_break
 | Ternary Bonsai 2 27B 零样本 | bonjev 自己的模板 | 194 / 231（公开） |
 | bonjev `vega_clef_plumb`（不训练、合并 LoRA 增量） | bonjev 自己的模板 | 207 / 231（公开） |
 | Ternary Bonsai 2 27B 零样本 | JEV `bare-v1`，经 `jevbench_eval.py` 转换 | 166 / 231（easy 47/48、original 58/72、hard 61/111） |
-| **Bonsai-JEV** | JEV `bare-v1`，经 `jevbench_eval.py` 转换 | *待测* |
+| **Bonsai-JEV** | JEV `bare-v1`，经 `jevbench_eval.py` 转换 | **194 / 231**（easy 48/48、original 71/72、hard 75/111） |
+
+比同一提示词下的零样本底座多对 28 题，几乎都在 `original` 和 `hard` 上。比 bonjev 最好的合并版本少 13 题，但它用的是自己的提示词；单是换提示词，零样本底座就差了 28 题。
 
 同一个底座，两种提示词的零样本差了 28 题：提示词的渲染方式影响很大。所以比较时既看绝对题数，也看每个适配器相对"同一提示词下零样本"的提升。231 题里 ±6 题以内是噪声。
 
@@ -102,7 +116,7 @@ JEV-27B 模型卡上的其他指标，同样的行、同样的定义（`kl_break
 | 文本决策，冷启动，挂适配器（`/v1/decide` 端到端） | p50 0.62 秒，p95 0.68 秒 |
 | 一张图 + 两个回答，冷启动 | p50 0.99 秒，p95 1.22 秒 |
 | 同一场景预热后的追问 | p50 0.23 秒 |
-| **8 GB 显卡**（PTQ1_0 + fp16 适配器 + 视觉，4k 上下文，显存限制在 7.5 GiB） | 文本 p50 0.42 秒，看图 p50 1.04 秒，占用约 7.1 GiB |
+| **8 GB 显卡**（PTQ1_0 + fp16 适配器 + 视觉，4k 上下文，显存限制在 7.5 GiB） | 文本 p50 0.42 秒，看图 p50 1.04 秒，占用约 7.1 GiB；不加载视觉约 6.3 GiB；视觉编码放 CPU（`MMPROJ=cpu`）约 6.3 GiB，看图 p50 3.4 秒 |
 
 **PTQ1_0**（5.95 GB，同一套三值权重的更紧凑打包）挂同一个适配器，决策完全一致：在 3,000 行测试数据上和 PQ2_0 的 top-1 一致率 100%，概率差为 0，而且更快。8 GB 显卡用它。
 

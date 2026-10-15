@@ -134,7 +134,7 @@ def decide(req: DecideRequest):
         "n_predict": 1, "n_probs": 1000, "post_sampling_probs": False, "cache_prompt": True, **LORA_ON,
         "temperature": 1.0, "top_k": 0, "top_p": 1.0, "min_p": 0.0, "samplers": [],
     }
-    for attempt in range(2):   # ponytail: one retry; seen rarely (~1/150 JevBench rows) a 200 without probabilities
+    for attempt in range(2):   # ponytail: one retry. Rarely (~1/230 rows) the sampled token is a partial UTF-8 byte; llama-server then holds it back and returns no tokens and no probabilities. Re-sampling fixes it
         r = _http.post(f"{LLAMA_URL}/completion", json=body, timeout=600)
         if not r.ok:
             raise HTTPException(502, f"llama-server: {r.status_code} {r.text[:300]}")

@@ -24,7 +24,7 @@ Bonsai-JEV is the JEV recipe applied to the Bonsai 2 base; credit for both ideas
 
 Also thanks to **[bonjev](https://github.com/ChezRD/bonjev) by ChezRD** (MIT), an earlier, training-free route to decisions on Ternary Bonsai: a Rust engine over the Prism llama.cpp libraries that combines existing decision-LoRA deltas. Its published [JevBench-231](https://github.com/fstandhartinger/jevbench) and Decision Index protocol and numbers are the external comparison we report against (`jevbench_eval.py` grades exactly like its exam).
 
-> **Status (2026-10-15): trained and evaluated through the deployment path** (fork + `adapter.gguf` on the ternary base). JevBench-231, the agent-judge benchmarks and the Decision Index run are still pending (*TBD*).
+> **Status (2026-10-15): trained and evaluated through the deployment path** (fork + `adapter.gguf` on the ternary base). The Decision Index run is still pending.
 
 ## Results
 
@@ -53,6 +53,7 @@ The other metrics of the JEV-27B card, same rows and definitions (`kl_breakdown.
 | Fitted temperatures noul / score / choice | 1.014 / 1.004 / 1.016 | 1.014 / 1.014 / 1.012 |
 | KL to ground-truth labels, unseen task families (`ood`) | **0.104** | 0.128 |
 | Top-1 accuracy, unseen task families | 0.942 | **0.948** |
+| Choice top-1 flips when the options are shuffled | 2.9% | 3.4% |
 | Choice top-1 flips when the options are reversed | — | 4.3% (zero-shot base: 65.7%) |
 
 † Ours bins each predicted option probability against the target probability; the JEV card does not define its ECE further, so treat the two as indicative.
@@ -79,6 +80,17 @@ Same protocol as the [JEV demo](https://github.com/yuhai-china/JEV-27B-DEMO/tree
 
 One forward pass without averaging: 77.5 (as given) / 79.1 (swapped). 78.0 vs 78.3 is inside the ±2.4 confidence interval of 1,247 pairs: a tie. The ternary base costs reasoning (−4.1) and gains hallucination (+1.7).
 
+### Agent judges (JEV-27B-DEMO prompts, through `/v1/decide`)
+
+| | JEV-27B-VL (published) | **Bonsai-JEV** |
+|---|---:|---:|
+| [AgentRewardBench](https://huggingface.co/datasets/McGill-NLP/agent-reward-bench), 1,302 web-agent trajectories, P(task completed) with the final screenshot: AUROC | 0.91 | **0.930** |
+| same, precision / recall at threshold 0.5 | 78.4 / 70.2 | 74.7 / 74.7 |
+| same, without the screenshot: AUROC | — | 0.922 |
+| [Plan-RewardBench](https://huggingface.co/datasets/wyy1112/Plan-RewardBench), 1,171 trajectory pairs, macro accuracy (both orders) | 73.2 | **74.7** |
+
+Both models are zero-shot on these tasks. Our probabilities rank completed vs failed trajectories slightly better (AUROC); at the fixed 0.5 threshold they trade 3.7 points of precision for 4.5 of recall, so pick the threshold for your use. On the 4070 one AgentRewardBench decision takes p50 3.6 s at ~2,800 prompt tokens.
+
 ### JevBench-231 (top-1 accuracy, bonjev's grading)
 
 | Model | prompt | correct |
@@ -86,7 +98,9 @@ One forward pass without averaging: 77.5 (as given) / 79.1 (swapped). 78.0 vs 78
 | Ternary Bonsai 2 27B, zero-shot | bonjev's own template | 194 / 231 (published) |
 | bonjev `vega_clef_plumb` (training-free LoRA merge) | bonjev's own template | 207 / 231 (published) |
 | Ternary Bonsai 2 27B, zero-shot | JEV `bare-v1` via `jevbench_eval.py` | 166 / 231 (easy 47/48, original 58/72, hard 61/111) |
-| **Bonsai-JEV** | JEV `bare-v1` via `jevbench_eval.py` | *TBD* |
+| **Bonsai-JEV** | JEV `bare-v1` via `jevbench_eval.py` | **194 / 231** (easy 48/48, original 71/72, hard 75/111) |
+
++28 tasks over the zero-shot base with the same prompt, almost all on `original` and `hard`. 13 behind bonjev's best merge, which uses its own prompt; the prompt alone moved the zero-shot base by 28.
 
 The two zero-shot rows differ by 28 tasks on the same base: the prompt rendering matters, so compare each adapter against the zero-shot row that uses its own prompt as well as on the absolute count. 231 tasks: ±6 is noise.
 
@@ -102,7 +116,7 @@ Order-agree is the share of pairs whose verdict survives swapping the two answer
 | Text decision, cold, with adapter (`/v1/decide`, end to end) | p50 0.62 s, p95 0.68 s |
 | Image + two answers, cold | p50 0.99 s, p95 1.22 s |
 | Follow-up question on a warmed scene | p50 0.23 s |
-| **8 GB card** (PTQ1_0 + fp16 adapter + vision, 4k context, VRAM capped at 7.5 GiB) | text p50 0.42 s, image p50 1.04 s, ~7.1 GiB used |
+| **8 GB card** (PTQ1_0 + fp16 adapter + vision, 4k context, VRAM capped at 7.5 GiB) | text p50 0.42 s, image p50 1.04 s, ~7.1 GiB used; without vision ~6.3 GiB; vision encoder on the CPU (`MMPROJ=cpu`) ~6.3 GiB, image p50 3.4 s |
 
 **PTQ1_0** (5.95 GB, the denser packing of the same ternary weights) runs the same adapter with identical decisions: 100% top-1 agreement and zero probability difference with PQ2_0 on 3,000 test rows, and it is faster. Use it on 8 GB cards.
 
