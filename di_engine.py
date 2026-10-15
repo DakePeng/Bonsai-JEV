@@ -76,3 +76,33 @@ if __name__ == "__main__":   # translation self-check, no server needed
     b, _ = translate({"a": 1}, {"type": "noul", "instructions": "ok?", "criteria": {"true": "yes", "false": "no"}})
     assert b["question"].endswith("false means: no") and b["kind"] == "noul"
     print("ok")
+
+
+class VisionMulti:
+    """Vision suite over several identical /v1/decide servers (one per GPU): the kit's HttpDecide, with each worker
+    thread pinned to one server, round-robin. --option base_urls=http://127.0.0.1:8001,http://127.0.0.1:8002"""
+
+    def __new__(cls, base_urls, **options):
+        import itertools
+        import threading
+
+        import httpx
+        from decision_index.vision.engines import HttpDecide
+
+        urls = [u.strip().rstrip("/") for u in base_urls.split(",") if u.strip()]
+        eng = HttpDecide(base_url=urls[0], **options)
+        nxt, lock, local, made = itertools.cycle(urls), threading.Lock(), threading.local(), []
+
+        def get():
+            c = getattr(local, "client", None)
+            if c is None:
+                with lock:
+                    c = local.client = httpx.Client(base_url=next(nxt), timeout=eng.clients.kwargs.get("timeout", 900),
+                                                    headers=eng.clients.kwargs.get("headers") or {})
+                    made.append(c)
+            return c
+
+        eng.clients.get = get
+        eng.clients.close = lambda: [c.close() for c in made]
+        eng.provenance = {**eng.provenance, "base_url": urls}
+        return eng

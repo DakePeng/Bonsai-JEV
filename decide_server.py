@@ -86,10 +86,18 @@ class DecideRequest(BaseModel):
 
 def _image_b64(src: str) -> str:
     if src.startswith("data:"):
-        return src.split(",", 1)[1]
-    if src.startswith(("http://", "https://")):
-        return base64.b64encode(_http.get(src, timeout=60).content).decode()
-    return base64.b64encode(open(src, "rb").read()).decode()
+        raw = base64.b64decode(src.split(",", 1)[1])
+    elif src.startswith(("http://", "https://")):
+        raw = _http.get(src, timeout=60).content
+    else:
+        raw = open(src, "rb").read()
+    if raw[:4] == b"RIFF" and raw[8:12] == b"WEBP":   # llama.cpp's image loader has no WebP: same pixels as PNG
+        import io
+        from PIL import Image
+        buf = io.BytesIO()
+        Image.open(io.BytesIO(raw)).save(buf, format="PNG")
+        raw = buf.getvalue()
+    return base64.b64encode(raw).decode()
 
 
 def render(kind, state, question, options):
