@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>Bonsai-JEV 一图流</title>
+<style>
+  :root { --surface: #fcfcfb; --card: #ffffff; --line: #e4e3df; --grid: #eeede9;
+          --ink: #0b0b0b; --ink-2: #52514e; --ink-3: #8a8984; --ours: #2a78d6; --ref: #eb6834; --other: #b9b8b2; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--surface); color: var(--ink);
+         font: 16px/1.5 -apple-system, "PingFang SC", "Hiragino Sans GB", "Helvetica Neue", sans-serif; }
+  .page { width: 1200px; padding: 48px 56px 36px; }
+  h1 { font-size: 48px; line-height: 1.05; margin: 0 0 10px; }
+  .tag { font-size: 24px; color: var(--ink-2); margin: 0 0 30px; }
+  .tag b { color: var(--ink); }
+  .tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 22px; }
+  .tile { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 18px 20px; }
+  .tile .k { font-size: 15px; color: var(--ink-3); }
+  .tile .v { font-size: 40px; font-weight: 700; margin: 2px 0 0; color: var(--ours); }
+  .tile .c { font-size: 15px; color: var(--ink-2); }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 20px 22px 12px; margin-bottom: 22px; }
+  .card h2 { font-size: 20px; margin: 0 0 2px; }
+  .card .note { font-size: 14px; color: var(--ink-3); margin: 0 0 6px; }
+  .runs { display: flex; gap: 12px; font-size: 16px; margin-bottom: 22px; }
+  .runs div { flex: 1; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px 16px; color: var(--ink-2); }
+  .runs b { display: block; font-size: 24px; color: var(--ink); }
+  svg text { font-family: inherit; }
+  .foot { color: var(--ink-3); font-size: 14px; }
+  .foot b { color: var(--ink-2); }
+</style>
+</head>
+<body>
+<div class="page">
+  <h1>Bonsai-JEV</h1>
+  <p class="tag"><b>8 GB 显卡</b>就能跑的 <b>27B 级决策模型</b>：看文字、看图，一次前向给出校准概率。</p>
+  <div class="tiles">
+    <div class="tile"><div class="k">显存</div><div class="v">6.8 GB</div><div class="c">JEV-27B-VL 约 56 GB</div></div>
+    <div class="tile"><div class="k">文本决策（KL，越低越好）</div><div class="v">0.0163</div><div class="c">JEV-27B 0.017，持平</div></div>
+    <div class="tile"><div class="k">看图判断（VL-RewardBench）</div><div class="v">78.0</div><div class="c">JEV-27B-VL 78.3，持平</div></div>
+    <div class="tile"><div class="k">DI 视觉公开分</div><div class="v">67.56</div><div class="c">d3-mini 67.67，持平</div></div>
+  </div>
+  <div class="card">
+    <h2>显存 vs 视觉能力</h2>
+    <p class="note">Decision Index 0.3 视觉公开分；其他模型按 BF16 估显存（参数量 × 2 字节）。</p>
+    <svg id="scatter" width="1080" height="430" role="img" aria-label="视觉公开分与显存的散点图"></svg>
+  </div>
+  <p class="note" style="font-size:15px;color:#52514e;margin:0 0 8px"><b style="color:#0b0b0b">能跑在哪：</b>一次文本决策的中位延迟</p>
+  <div class="runs">
+    <div>RTX 4070 12 GB<b>0.6 秒</b></div>
+    <div>8 GB 显卡<b>0.4 秒</b></div>
+    <div>Mac mini M4 16 GB<b>2.1 秒</b></div>
+    <div>Radeon 780M 核显<b>4.3 秒</b></div>
+  </div>
+  <p class="foot" style="margin-top:-12px">基于 Prism ML 的 Ternary Bonsai 2 27B 和 autotrust 的 JEV 配方；独立项目，与二者无隶属关系。<br>
+  <b>github.com/DakePeng/Bonsai-JEV</b> · modelscope.cn/models/dakepeng/Bonsai-JEV · huggingface.co/dakebakery/Bonsai-JEV · Apache 2.0</p>
+</div>
+<script>
+const NS = "http://www.w3.org/2000/svg";
+const el = (tag, attrs, parent, text) => { const e = document.createElementNS(NS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]); if (text != null) e.textContent = text; parent.appendChild(e); return e; };
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+
+// ---- scatter: public vision index vs weights in memory (log x)
+(() => {
+  const svg = document.getElementById("scatter"), W = 1080, H = 430, m = {l: 52, r: 20, t: 14, b: 46};
+  const pts = [
+    {n: "Bonsai-JEV", gb: 6.8, y: 67.56, ours: true, dx: 13, dy: 26},
+    {n: "d3-mini 4B", gb: 9.1, y: 67.67, dx: 9, dy: -9},
+    {n: "JPT-4B", gb: 9.3, y: 64.62, dx: 9, dy: 4},
+    {n: "d3-flash 9B", gb: 16.8, y: 69.87, dx: 9, dy: 4},
+    {n: "JPT-9B", gb: 19.3, y: 65.39, dx: 9, dy: 4},
+    {n: "Winnow-12B", gb: 23.9, y: 63.86, dx: 9, dy: 4},
+    {n: "d3 27B", gb: 52.2, y: 74.08, dx: -9, dy: 4, anchor: "end"},
+    {n: "JEV-27B-VL", gb: 55.6, y: 72.80, dx: -9, dy: 4, anchor: "end", ref: true},
+    {n: "Xor 1.2 (35B-A3B)", gb: 71.9, y: 70.21, dx: -9, dy: 4, anchor: "end"},
+  ];
+  const x0 = Math.log(5), x1 = Math.log(90), y0 = 62, y1 = 75.5;
+  const X = gb => m.l + (Math.log(gb) - x0) / (x1 - x0) * (W - m.l - m.r);
+  const Y = v => H - m.b - (v - y0) / (y1 - y0) * (H - m.t - m.b);
+  for (const v of [64, 66, 68, 70, 72, 74]) {
+    el("line", {x1: m.l, x2: W - m.r, y1: Y(v), y2: Y(v), stroke: css("--grid")}, svg);
+    el("text", {x: m.l - 8, y: Y(v) + 4, "text-anchor": "end", "font-size": 12, fill: css("--ink-3")}, svg, v);
+  }
+  for (const g of [6, 8, 12, 16, 24, 32, 48, 64]) {
+    el("line", {x1: X(g), x2: X(g), y1: H - m.b, y2: H - m.b + 5, stroke: css("--ink-3")}, svg);
+    el("text", {x: X(g), y: H - m.b + 19, "text-anchor": "middle", "font-size": 12, fill: css("--ink-3")}, svg, g);
+  }
+  el("line", {x1: m.l, x2: W - m.r, y1: H - m.b, y2: H - m.b, stroke: css("--ink-3")}, svg);
+  el("text", {x: (W + m.l) / 2, y: H - 6, "text-anchor": "middle", "font-size": 12.5, fill: css("--ink-2")}, svg, "显存中的权重（GB，对数刻度）");
+  el("text", {x: 12, y: (H - m.b + m.t) / 2, transform: `rotate(-90 12 ${(H - m.b + m.t) / 2})`, "text-anchor": "middle", "font-size": 12.5, fill: css("--ink-2")}, svg, "视觉公开分");
+  // 8 GB budget band
+  el("rect", {x: m.l, y: m.t, width: X(8) - m.l, height: H - m.t - m.b, fill: css("--ours"), opacity: 0.07}, svg);
+  el("text", {x: m.l + 6, y: m.t + 16, "font-size": 12, fill: css("--ours"), "font-weight": 600}, svg, "8 GB 以内");
+  for (const p of pts) {
+    const c = p.ours ? css("--ours") : p.ref ? css("--ref") : css("--other");
+    el("circle", {cx: X(p.gb), cy: Y(p.y), r: p.ours ? 9 : 6.5, fill: c, stroke: css("--card"), "stroke-width": 2}, svg);
+    el("text", {x: X(p.gb) + p.dx, y: Y(p.y) + p.dy, "text-anchor": p.anchor || "start", "font-size": p.ours ? 14 : 12.5,
+                "font-weight": p.ours || p.ref ? 700 : 400, fill: p.ours || p.ref ? css("--ink") : css("--ink-2")}, svg, `${p.n} ${p.y.toFixed(1)}`);
+  }
+})();
+
+</script>
+</body>
+</html>
