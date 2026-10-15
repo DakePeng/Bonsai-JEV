@@ -25,7 +25,13 @@
   .runs div { flex: 1; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px 16px; color: var(--ink-2); }
   .runs b { display: block; font-size: 24px; color: var(--ink); }
   svg text { font-family: inherit; }
-  .foot { color: var(--ink-3); font-size: 14px; }
+  .foot { color: var(--ink-3); font-size: 14px; margin: 0; }
+  .runs .m { display: block; font-size: 13px; color: var(--ink-3); }
+  .ctx { font-size: 15px; color: var(--ink-2); margin: -8px 0 18px; }
+  .ctx b { color: var(--ink); }
+  .links { display: flex; gap: 28px; font-size: 16px; color: var(--ink); font-weight: 600; margin-bottom: 8px; }
+  .links span { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+  .links img { width: 26px; height: 26px; object-fit: contain; }
   .foot b { color: var(--ink-2); }
 </style>
 </head>
@@ -34,7 +40,7 @@
   <h1>Bonsai-JEV</h1>
   <p class="tag"><b>8 GB 显卡</b>就能跑的 <b>27B 级决策模型</b>：看文字、看图，一次前向给出校准概率。</p>
   <div class="tiles">
-    <div class="tile"><div class="k">显存</div><div class="v">6.8 GB</div><div class="c">JEV-27B-VL 约 56 GB</div></div>
+    <div class="tile"><div class="k">显存（PTQ1_0 量化版）</div><div class="v">6.8 GB</div><div class="c">三值 1.75 bit 底座 + 视觉 + fp16 适配器<br>JEV-27B-VL 约 56 GB</div></div>
     <div class="tile"><div class="k">文本决策（KL，越低越好）</div><div class="v">0.0163</div><div class="c">JEV-27B 0.017，持平</div></div>
     <div class="tile"><div class="k">看图判断（VL-RewardBench）</div><div class="v">78.0</div><div class="c">JEV-27B-VL 78.3，持平</div></div>
     <div class="tile"><div class="k">DI 视觉公开分</div><div class="v">67.56</div><div class="c">d3-mini 67.67，持平</div></div>
@@ -44,15 +50,20 @@
     <p class="note">Decision Index 0.3 视觉公开分；其他模型按 BF16 估显存（参数量 × 2 字节）。</p>
     <svg id="scatter" width="1080" height="430" role="img" aria-label="视觉公开分与显存的散点图"></svg>
   </div>
-  <p class="note" style="font-size:15px;color:#52514e;margin:0 0 8px"><b style="color:#0b0b0b">能跑在哪：</b>一次文本决策的中位延迟</p>
+  <p class="note" style="font-size:15px;color:#52514e;margin:0 0 8px"><b style="color:#0b0b0b">能跑在哪：</b>单次决策的中位延迟（文本 / 一张图 + 两段回答的对比判断）</p>
   <div class="runs">
-    <div>RTX 4070 12 GB<b>0.6 秒</b></div>
-    <div>8 GB 显卡<b>0.4 秒</b></div>
-    <div>Mac mini M4 16 GB<b>2.1 秒</b></div>
-    <div>Radeon 780M 核显<b>4.3 秒</b></div>
+    <div>RTX 4070 12 GB<span class="m">PQ2_0 · CUDA</span><b>0.6 秒 / 1.0 秒</b></div>
+    <div>8 GB 显卡<span class="m">PTQ1_0 · 4070 限 7.5 GiB 模拟</span><b>0.4 秒 / 1.0 秒</b></div>
+    <div>Mac mini M4 16 GB<span class="m">MLX 2-bit · Metal</span><b>2.1 秒 / 13.8 秒</b></div>
+    <div>Radeon 780M 核显<span class="m">PTQ1_0 · Vulkan</span><b>4.3 秒 / 13.3 秒</b></div>
   </div>
-  <p class="foot" style="margin-top:-12px">基于 Prism ML 的 Ternary Bonsai 2 27B 和 autotrust 的 JEV 配方；独立项目，与二者无隶属关系。<br>
-  <b>github.com/DakePeng/Bonsai-JEV</b> · modelscope.cn/models/dakepeng/Bonsai-JEV · huggingface.co/dakebakery/Bonsai-JEV · Apache 2.0</p>
+  <p class="ctx"><b>8 GB 显卡能开多长上下文：</b>4k token 时实测峰值 7.1 GiB（含视觉编码器）。KV cache 每 token 只要 64 KiB（64 层里只有 16 层是全注意力），按剩余显存推算约 <b>1 万 token</b>；视觉编码器放 CPU 约 <b>2.3 万 token</b>，KV 用 q8_0 再翻倍。</p>
+  <div class="links">
+    <span><img src="logos/github.svg">GitHub · DakePeng/Bonsai-JEV</span>
+    <span><img src="logos/huggingface.svg">Hugging Face · dakebakery/Bonsai-JEV</span>
+    <span><img src="logos/modelscope.png">ModelScope · dakepeng/Bonsai-JEV</span>
+  </div>
+  <p class="foot">基于 Prism ML 的 Ternary Bonsai 2 27B 和 autotrust 的 JEV 配方；独立项目，与二者无隶属关系。Apache 2.0。</p>
 </div>
 <script>
 const NS = "http://www.w3.org/2000/svg";
