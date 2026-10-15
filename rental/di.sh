@@ -22,6 +22,9 @@ log() { echo "[$(date +%H:%M:%S)] $*"; }
 case "${1:-}" in
 setup)
   mkdir -p $W
+  for f in Ternary-Bonsai-2-27B-PQ2_0.gguf Ternary-Bonsai-2-27B-mmproj-Q8_0.gguf adapter.gguf decision.json; do   # copy prepared on storage
+    [ -e $W/$f ] || [ ! -f $R/weights/$f ] || cp $R/weights/$f $W/$f
+  done
   for f in Ternary-Bonsai-2-27B-PQ2_0.gguf Ternary-Bonsai-2-27B-mmproj-Q8_0.gguf adapter.gguf; do
     [ -e $W/$f ] || bash $J/rental/msdl.sh dakepeng/Bonsai-JEV $f $W/$f 16
   done

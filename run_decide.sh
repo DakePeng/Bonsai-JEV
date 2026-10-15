@@ -5,7 +5,7 @@
 #   bash run_decide.sh stop
 # env: BASE_GGUF (default Ternary-Bonsai-2-27B-PQ2_0.gguf; PTQ1_0 for tight memory), ADAPTER_FILE (default adapter.gguf),
 #      MMPROJ=gpu|cpu|none (default gpu; cpu runs the vision encoder on the CPU to save ~0.9 GB VRAM), CTX, NP,
-#      LLAMA_BIN (dir with the fork's llama-server; default ~/bonsai/llama.cpp/build/bin), VENV (optional, activated if set)
+#      CACHE_RAM (MiB of RAM for evicted prompt caches, default 16384; use ~2048 on shared-memory iGPUs), LLAMA_BIN (dir with the fork's llama-server; default ~/bonsai/llama.cpp/build/bin), VENV (optional, activated if set)
 set -u
 [ -n "${2:-}" ] && [ -d "$2" ] && set -- "$1" "$(cd "$2" && pwd)"   # absolute adapter dir before the cd below
 cd "$(dirname "$0")"
@@ -41,7 +41,7 @@ case "${1:-start}" in
     # -np 2: two slots; the server routes a request to the slot with the longest common prefix.
     # --cache-ram / --cache-reuse: keep evicted prompts in RAM and reuse partial prefixes (KNOWN_ISSUES.md).
     setsid nohup $BIN/llama-server -m $M/$BASE $MM \
-      $LORA -ngl 99 -c ${CTX:-8192} -np ${NP:-2} --cache-ram 16384 --cache-reuse 256 --port $LPORT --host 127.0.0.1 \
+      $LORA -ngl 99 -c ${CTX:-8192} -np ${NP:-2} --cache-ram ${CACHE_RAM:-16384} --cache-reuse 256 --port $LPORT --host 127.0.0.1 \
       > results/llama_server_$LPORT.log 2>&1 < /dev/null &
     for i in $(seq 1 60); do curl -sf http://127.0.0.1:$LPORT/health > /dev/null && break; sleep 2; done
     curl -sf http://127.0.0.1:$LPORT/health > /dev/null || { echo "llama-server failed, see results/llama_server_$LPORT.log"; exit 1; }
