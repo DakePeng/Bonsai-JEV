@@ -13,21 +13,12 @@ set -eu
 # whichever instance in the region has free GPUs (prepare on a no-GPU instance, run on another).
 R=${BONSAI_ROOT:-$HOME/bonsai}; mkdir -p $R; DI=$R/di; W=$R/weights; J=$R/jev
 MIRROR=${PIP_MIRROR:-https://repo.huaweicloud.com/repository/pypi/simple}
-export PIP_NO_CACHE_DIR=1 LLAMA_BIN=$R/llama.cpp/build/bin VENV=$R/venv-di PATH=/usr/local/cuda/bin:/root/miniconda3/bin:$PATH
+L=${LOCAL_ROOT:-$HOME/autodl-tmp/bonsai-local}; mkdir -p $L   # venv + build on the instance's own disk (network storage is slow for many small files)
+export PIP_NO_CACHE_DIR=1 LLAMA_BIN=$L/llama.cpp/build/bin VENV=$L/venv-di PATH=/usr/local/cuda/bin:/root/miniconda3/bin:$PATH
 log() { echo "[$(date +%H:%M:%S)] $*"; }
 
 case "${1:-}" in
 setup)
-  [ -d $VENV ] || python3 -m venv $VENV
-  $VENV/bin/pip install -q -i $MIRROR -U pip
-  $VENV/bin/pip install -q -i $MIRROR fastapi "uvicorn[standard]" requests pydantic pillow httpx pyarrow numpy
-  $VENV/bin/pip install -q -i $MIRROR -e "$DI/decision-index[vision]"
-  if [ ! -x $LLAMA_BIN/llama-server ]; then
-    mkdir -p $R/llama.cpp && tar xzf $R/llama.cpp-src.tgz -C $R/llama.cpp
-    cmake -S $R/llama.cpp -B $R/llama.cpp/build -DGGML_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES=120 -DLLAMA_CURL=OFF \
-      -DCMAKE_BUILD_TYPE=Release > $R/cmake.log 2>&1
-    cmake --build $R/llama.cpp/build --target llama-server -j "$(nproc)" > $R/build.log 2>&1
-  fi
   mkdir -p $W
   for f in Ternary-Bonsai-2-27B-PQ2_0.gguf Ternary-Bonsai-2-27B-mmproj-Q8_0.gguf; do   # Prism's files, same bytes as the release
     for m in $R/models/bonsai2-27b ~/autodl-tmp/bonsai/models/bonsai2-27b; do
@@ -39,6 +30,16 @@ setup)
   done
   (cd $W && sha256sum Ternary-Bonsai-2-27B-PQ2_0.gguf Ternary-Bonsai-2-27B-mmproj-Q8_0.gguf adapter.gguf)
   [ -f $W/decision.json ] || curl -sL -o $W/decision.json "https://www.modelscope.cn/api/v1/models/dakepeng/Bonsai-JEV/repo?Revision=master&FilePath=decision.json"
+  [ -d $VENV ] || python3 -m venv $VENV
+  $VENV/bin/pip install -q -i $MIRROR -U pip
+  $VENV/bin/pip install -q -i $MIRROR fastapi "uvicorn[standard]" requests pydantic pillow httpx pyarrow numpy
+  $VENV/bin/pip install -q -i $MIRROR -e "$DI/decision-index[vision]"
+  if [ ! -x $LLAMA_BIN/llama-server ]; then
+    mkdir -p $L/llama.cpp && tar xzf $R/llama.cpp-src.tgz -C $L/llama.cpp
+    cmake -S $L/llama.cpp -B $L/llama.cpp/build -DGGML_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES=120 -DLLAMA_CURL=OFF \
+      -DCMAKE_BUILD_TYPE=Release > $L/cmake.log 2>&1
+    cmake --build $L/llama.cpp/build --target llama-server -j "$(nproc)" > $L/build.log 2>&1
+  fi
   python3 -c "import json; d=json.load(open('$W/decision.json')); print('temperatures', d['per_kind_temperature'])"
   $LLAMA_BIN/llama-server --version 2>&1 | tail -1
   log "setup done"
