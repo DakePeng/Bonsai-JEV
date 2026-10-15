@@ -113,8 +113,11 @@ Order-agree is the share of pairs whose verdict survives swapping the two answer
 | Prompt processing / generation, PQ2_0 | 1,226 / 49.6 tok/s (`llama-bench` pp512 / tg128) |
 | Prompt processing / generation, PTQ1_0 | 1,315 / 63.1 tok/s |
 | Peak VRAM, PQ2_0 + vision + 4k context | 9.17 GB |
-| Text decision, cold, with adapter (`/v1/decide`, end to end) | p50 0.62 s, p95 0.68 s |
-| Image + two answers, cold | p50 0.99 s, p95 1.22 s |
+| Service start (`run_decide.sh start`: base + adapter + vision loaded, both servers healthy) | 12 s (model file already in the OS page cache) |
+| First request after start: text / image | 0.54 s / 0.98 s (no separate GPU warm-up needed) |
+| Text decision, new state (no prefix to reuse), with adapter, end to end | p50 0.62 s, p95 0.68 s |
+| Image + two answers, new image | p50 0.99 s, p95 1.22 s |
+| Warming a scene (`/v1/warm`, one image) | p50 1.19 s, once per scene |
 | Follow-up question on a warmed scene | p50 0.23 s |
 | **8 GB card** (PTQ1_0 + fp16 adapter + vision, 4k context, VRAM capped at 7.5 GiB) | text p50 0.42 s, image p50 1.04 s, ~7.1 GiB used; without vision ~6.3 GiB; vision encoder on the CPU (`MMPROJ=cpu`) ~6.3 GiB, image p50 3.4 s |
 

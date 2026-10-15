@@ -98,8 +98,9 @@ Order-agree is the share of pairs whose verdict survives swapping the two answer
 |---|---|
 | Prompt processing / generation, PQ2_0 / PTQ1_0 | 1,226 / 49.6 and 1,315 / 63.1 tokens/s |
 | Peak VRAM (PQ2_0 + vision + 4k context) | 9.17 GB |
-| `/v1/decide` end to end: text / image + two answers, cold (p50) | 0.62 s / 0.99 s |
-| Follow-up question on a warmed scene (p50) | 0.23 s |
+| Service start / first request after start (text, image) | 12 s / 0.54 s, 0.98 s |
+| `/v1/decide` end to end, new state: text / image + two answers (p50) | 0.62 s / 0.99 s |
+| Warming a scene with `/v1/warm` (one image) / each follow-up question (p50) | 1.19 s once / 0.23 s |
 | 8 GB card: PTQ1_0 + fp16 adapter + vision, 4k context, VRAM capped at 7.5 GiB | text 0.42 s, image 1.04 s (p50), ~7.1 GiB used; vision on the CPU (`MMPROJ=cpu`): ~6.3 GiB, image 3.4 s |
 | Max context on 12 GB | ~24–32k tokens (f16 KV), ~48–60k (q8_0 KV) |
 
