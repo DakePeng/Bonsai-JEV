@@ -9,9 +9,9 @@
 # Expects (uploaded from the Mac): ~/bonsai/jev (this repo), ~/bonsai/llama.cpp-src.tgz (fork @ e8fd209, no build/.git),
 # ~/bonsai/di/decision-index (kit @ f5a6e4f), ~/bonsai/di/suite-0.3 and ~/bonsai/di/vision (rebuilt suites, private).
 set -eu
-DATA=${DATA_DISK:-$HOME/autodl-tmp}; [ -d "$DATA" ] || DATA=$HOME
-[ -e ~/bonsai ] || { mkdir -p $DATA/bonsai && ln -s $DATA/bonsai ~/bonsai; }
-R=~/bonsai; DI=$R/di; W=$R/weights; J=$R/jev
+# BONSAI_ROOT=/root/autodl-fs/bonsai keeps everything on AutoDL's region-wide file storage, so the run can move to
+# whichever instance in the region has free GPUs (prepare on a no-GPU instance, run on another).
+R=${BONSAI_ROOT:-$HOME/bonsai}; mkdir -p $R; DI=$R/di; W=$R/weights; J=$R/jev
 MIRROR=${PIP_MIRROR:-https://repo.huaweicloud.com/repository/pypi/simple}
 export PIP_NO_CACHE_DIR=1 LLAMA_BIN=$R/llama.cpp/build/bin VENV=$R/venv-di PATH=/usr/local/cuda/bin:/root/miniconda3/bin:$PATH
 log() { echo "[$(date +%H:%M:%S)] $*"; }
@@ -30,12 +30,14 @@ setup)
   fi
   mkdir -p $W
   for f in Ternary-Bonsai-2-27B-PQ2_0.gguf Ternary-Bonsai-2-27B-mmproj-Q8_0.gguf; do   # Prism's files, same bytes as the release
-    [ -f $R/models/bonsai2-27b/$f ] && [ ! -e $W/$f ] && ln -s $R/models/bonsai2-27b/$f $W/$f
+    for m in $R/models/bonsai2-27b ~/autodl-tmp/bonsai/models/bonsai2-27b; do
+      [ -f $m/$f ] && [ ! -e $W/$f ] && cp $m/$f $W/$f
+    done
   done
   for f in Ternary-Bonsai-2-27B-PQ2_0.gguf Ternary-Bonsai-2-27B-mmproj-Q8_0.gguf adapter.gguf; do
     [ -e $W/$f ] || bash $J/rental/msdl.sh dakepeng/Bonsai-JEV $f $W/$f 16
   done
-  (cd $W && sha256sum -L Ternary-Bonsai-2-27B-PQ2_0.gguf Ternary-Bonsai-2-27B-mmproj-Q8_0.gguf adapter.gguf)
+  (cd $W && sha256sum Ternary-Bonsai-2-27B-PQ2_0.gguf Ternary-Bonsai-2-27B-mmproj-Q8_0.gguf adapter.gguf)
   [ -f $W/decision.json ] || curl -sL -o $W/decision.json "https://www.modelscope.cn/api/v1/models/dakepeng/Bonsai-JEV/repo?Revision=master&FilePath=decision.json"
   python3 -c "import json; d=json.load(open('$W/decision.json')); print('temperatures', d['per_kind_temperature'])"
   $LLAMA_BIN/llama-server --version 2>&1 | tail -1
