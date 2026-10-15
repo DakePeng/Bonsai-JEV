@@ -10,8 +10,10 @@
 # ~/bonsai/di/decision-index (kit @ f5a6e4f), ~/bonsai/di/suite-0.3 and ~/bonsai/di/vision (rebuilt suites, private).
 set -eu
 # BONSAI_ROOT=/root/autodl-fs/bonsai keeps everything on AutoDL's region-wide file storage, so the run can move to
-# whichever instance in the region has free GPUs (prepare on a no-GPU instance, run on another).
-R=${BONSAI_ROOT:-$HOME/bonsai}; mkdir -p $R; DI=$R/di; W=$R/weights; J=$R/jev
+# whichever instance in the region has free GPUs (prepare on a no-GPU instance, run on another). Weights are not kept
+# there: each GPU instance pulls them from ModelScope (16 streams, ~7 min), since copying 7 GB into the network storage
+# fills a no-GPU instance's small memory with page cache.
+R=${BONSAI_ROOT:-$HOME/bonsai}; mkdir -p $R; DI=$R/di; W=${WEIGHTS_DIR:-$HOME/autodl-tmp/bonsai-weights}; J=$R/jev
 MIRROR=${PIP_MIRROR:-https://repo.huaweicloud.com/repository/pypi/simple}
 L=${LOCAL_ROOT:-$HOME/autodl-tmp/bonsai-local}; mkdir -p $L   # venv + build on the instance's own disk (network storage is slow for many small files)
 export PIP_NO_CACHE_DIR=1 LLAMA_BIN=$L/llama.cpp/build/bin VENV=$L/venv-di PATH=/usr/local/cuda/bin:/root/miniconda3/bin:$PATH
@@ -20,11 +22,6 @@ log() { echo "[$(date +%H:%M:%S)] $*"; }
 case "${1:-}" in
 setup)
   mkdir -p $W
-  for f in Ternary-Bonsai-2-27B-PQ2_0.gguf Ternary-Bonsai-2-27B-mmproj-Q8_0.gguf; do   # Prism's files, same bytes as the release
-    for m in $R/models/bonsai2-27b ~/autodl-tmp/bonsai/models/bonsai2-27b; do
-      [ -f $m/$f ] && [ ! -e $W/$f ] && cp $m/$f $W/$f
-    done
-  done
   for f in Ternary-Bonsai-2-27B-PQ2_0.gguf Ternary-Bonsai-2-27B-mmproj-Q8_0.gguf adapter.gguf; do
     [ -e $W/$f ] || bash $J/rental/msdl.sh dakepeng/Bonsai-JEV $f $W/$f 16
   done
