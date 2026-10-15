@@ -24,6 +24,8 @@ tags:
 
 # Bonsai-JEV
 
+![Bonsai-JEV 一图流](https://www.modelscope.cn/models/dakepeng/Bonsai-JEV/resolve/master/assets/overview.zh.png)
+
 **8 GB 显卡就能跑、能看图、输出校准概率的 27B 决策模型。** 把 [JEV](https://modelscope.cn/models/autotrust/JEV-27B) 的配方（LoRA + 24 位决策头，用软标签蒸馏）训练在 [Ternary Bonsai 2 27B](https://modelscope.cn/models/prism-ml/Ternary-Bonsai-2-27B-gguf) 上。后者是 Prism ML 把 Qwen3.8-27B 压缩成三值的版本。对一个有类型的问题（是/否、0–5 打分、2–16 选 1）提问，状态里可以带图，一次前向就输出各选项的校准概率，不生成文字。
 
 **代码、训练配方和评测脚本：** [github.com/DakePeng/Bonsai-JEV](https://github.com/DakePeng/Bonsai-JEV) · 英文模型卡：[Hugging Face](https://huggingface.co/dakebakery/Bonsai-JEV)

@@ -35,7 +35,10 @@
   tr:last-child td { border-bottom: 0; }
   .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: 0; }
   svg text { font-family: inherit; }
-  .foot { display: flex; justify-content: space-between; color: var(--ink-3); font-size: 13px; margin-top: 18px; }
+  .foot { color: var(--ink-3); font-size: 13px; margin-top: 18px; }
+  .links { display: flex; gap: 30px; font-size: 15px; color: var(--ink); font-weight: 600; margin-bottom: 8px; }
+  .links span { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+  .links img { width: 24px; height: 24px; object-fit: contain; }
   .foot b { color: var(--ink-2); }
 </style>
 </head>
@@ -88,18 +91,19 @@
       <table>
         <tr><th>Device</th><th>Text</th><th>Image</th></tr>
         <tr><td>RTX 4070 12 GB &middot; PQ2_0</td><td class="ours">0.62 s</td><td class="ours">0.99 s</td></tr>
-        <tr><td>8 GB GPU &middot; PTQ1_0 (VRAM capped)</td><td class="ours">0.42 s</td><td class="ours">1.04 s</td></tr>
+        <tr><td>8 GB GPU &middot; PTQ1_0 <span style="color:#8a8984;font-size:12.5px">(4070 capped at 7.5 GiB)</span></td><td class="ours">0.42 s</td><td class="ours">1.04 s</td></tr>
         <tr><td>RTX PRO 6000 &middot; DI rows</td><td class="ours">0.65 s</td><td class="ours">0.99 s</td></tr>
-        <tr><td>Apple M4 16 GB &middot; MLX 2-bit</td><td class="ours">2.1 s</td><td>&mdash;</td></tr>
+        <tr><td>Apple M4 16 GB &middot; MLX 2-bit</td><td class="ours">2.1 s</td><td class="ours">13.8 s</td></tr>
         <tr><td>Radeon 780M iGPU &middot; Vulkan</td><td class="ours">4.3 s</td><td class="ours">13.3 s</td></tr>
       </table>
-      <p class="note" style="margin:12px 0 0">Several questions about one scene: warm it once, then each follow-up costs only its question (0.23 s on the 4070). System&nbsp;2 is untouched: with the adapter off, answers are byte-identical to Ternary Bonsai 2.</p>
+      <p class="note" style="margin:12px 0 0"><b style="color:#52514e">Context on an 8 GB card:</b> 4k tokens measured at 7.1 GiB peak with the vision encoder; the KV cache is only 64 KiB/token (16 of 64 layers are full attention), so ~10k tokens fit, ~23k with the vision encoder on the CPU, twice that with q8_0 KV (estimates). Image = one image + two answers to compare.</p>
+      <p class="note" style="margin:8px 0 0">Several questions about one scene: warm it once, then each follow-up costs only its question (0.23 s on the 4070). System&nbsp;2 is untouched: with the adapter off, answers are byte-identical to Ternary Bonsai 2.</p>
     </div>
   </div>
 
   <div class="foot">
-    <div><b>github.com/DakePeng/Bonsai-JEV</b> &middot; huggingface.co/dakebakery/Bonsai-JEV &middot; modelscope.cn/models/dakepeng/Bonsai-JEV &middot; Apache 2.0</div>
-    <div>Built on Ternary Bonsai 2 27B (Prism ML) and the JEV-9B / JEV-27B recipe (autotrust). Independent project, not affiliated.</div>
+    <div class="links"><span><img src="logos/github.svg">GitHub &middot; DakePeng/Bonsai-JEV</span><span><img src="logos/huggingface.svg">Hugging Face &middot; dakebakery/Bonsai-JEV</span><span><img src="logos/modelscope.png">ModelScope &middot; dakepeng/Bonsai-JEV</span></div>
+    <div>Built on Ternary Bonsai 2 27B (Prism ML) and the JEV-9B / JEV-27B recipe (autotrust). Independent project, not affiliated. Apache 2.0.</div>
   </div>
 </div>
 

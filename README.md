@@ -1,5 +1,7 @@
 # Bonsai-JEV
 
+![Bonsai-JEV at a glance](assets/overview.png)
+
 **A calibrated, image-capable 27B decision model that fits on an 8 GB GPU.** The [JEV](https://huggingface.co/autotrust/JEV-27B) recipe (LoRA + 24-slot decision head, distilled to soft labels) trained on top of [Ternary Bonsai 2 27B](https://huggingface.co/prism-ml/Ternary-Bonsai-2-27B-gguf), PrismML's ternary (−1/0/+1) compression of Qwen3.8-27B. The base stays ternary and frozen; the adapter is a separate file. One forward pass returns calibrated probabilities over the options of a typed question (yes/no, 0–5 score, or 2–16-way choice), with or without images.
 
 **Weights:** [Hugging Face · dakebakery/Bonsai-JEV](https://huggingface.co/dakebakery/Bonsai-JEV) · [ModelScope · dakepeng/Bonsai-JEV](https://modelscope.cn/models/dakepeng/Bonsai-JEV) (same files; ModelScope is faster from mainland China) · **Apple Silicon (MLX):** [Hugging Face · dakebakery/Bonsai-JEV-mlx](https://huggingface.co/dakebakery/Bonsai-JEV-mlx) · [ModelScope · dakepeng/Bonsai-JEV-mlx](https://modelscope.cn/models/dakepeng/Bonsai-JEV-mlx) · [中文说明](README.zh.md)
