@@ -2,7 +2,7 @@
 
 **A calibrated, image-capable 27B decision model that fits on an 8 GB GPU.** The [JEV](https://huggingface.co/autotrust/JEV-27B) recipe (LoRA + 24-slot decision head, distilled to soft labels) trained on top of [Ternary Bonsai 2 27B](https://huggingface.co/prism-ml/Ternary-Bonsai-2-27B-gguf), PrismML's ternary (−1/0/+1) compression of Qwen3.8-27B. The base stays ternary and frozen; the adapter is a separate file. One forward pass returns calibrated probabilities over the options of a typed question (yes/no, 0–5 score, or 2–16-way choice), with or without images.
 
-[中文说明](README.zh.md)
+**Weights:** [Hugging Face · dakebakery/Bonsai-JEV](https://huggingface.co/dakebakery/Bonsai-JEV) · [ModelScope · dakepeng/Bonsai-JEV](https://modelscope.cn/models/dakepeng/Bonsai-JEV) (same files; ModelScope is faster from mainland China) · [中文说明](README.zh.md)
 
 | | JEV-27B / JEV-27B-VL | **Bonsai-JEV** |
 |---|---|---|
@@ -114,7 +114,7 @@ Max context on 12 GB: ~24–32k tokens with f16 KV, ~48–60k with q8_0 KV (only
 
 Requires the [PrismML llama.cpp fork](https://github.com/PrismML-Eng/llama.cpp) built from source with CUDA (stock llama.cpp cannot load PQ2_0; on AVX-512 CPUs such as Zen 4 the release binaries crash on load, see the model's KNOWN_ISSUES).
 
-Everything needed to serve (base GGUF, vision projector, adapter, calibration) is in one model repo, mirrored on [Hugging Face](https://huggingface.co/dakebakery/Bonsai-JEV) and [ModelScope](https://modelscope.cn/models/dakepeng/Bonsai-JEV) (uploaded at release). The base is Prism ML's file, byte-identical to the one the adapter was validated against.
+Everything needed to serve (base GGUF, vision projector, adapter, calibration) is in one model repo, mirrored on [Hugging Face](https://huggingface.co/dakebakery/Bonsai-JEV) and [ModelScope](https://modelscope.cn/models/dakepeng/Bonsai-JEV). The base is Prism ML's file, byte-identical to the one the adapter was validated against.
 
 ```bash
 pip install fastapi uvicorn requests pydantic pillow

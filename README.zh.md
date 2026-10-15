@@ -2,7 +2,7 @@
 
 **一个 8 GB 显卡就能跑、能看图、输出校准概率的 27B 决策模型。** 把 [JEV](https://huggingface.co/autotrust/JEV-27B) 的配方（LoRA + 24 位决策头，用软标签蒸馏）训练在 [Ternary Bonsai 2 27B](https://huggingface.co/prism-ml/Ternary-Bonsai-2-27B-gguf) 上。后者是 PrismML 把 Qwen3.8-27B 压缩成三值（−1/0/+1）的版本。底座保持三值、冻结不动，适配器是单独一个文件。对一个有类型的问题（是/否、0–5 打分、2–16 选 1），带图或不带图，一次前向就输出各选项的校准概率。
 
-[English](README.md)
+**权重：** [ModelScope · dakepeng/Bonsai-JEV](https://modelscope.cn/models/dakepeng/Bonsai-JEV)（国内推荐）· [Hugging Face · dakebakery/Bonsai-JEV](https://huggingface.co/dakebakery/Bonsai-JEV)（两边文件相同）· [English](README.md)
 
 | | JEV-27B / JEV-27B-VL | **Bonsai-JEV** |
 |---|---|---|
@@ -114,7 +114,7 @@ JEV-27B 模型卡上的其他指标，同样的行、同样的定义（`kl_break
 
 需要从源码带 CUDA 编译 [PrismML 的 llama.cpp 分支](https://github.com/PrismML-Eng/llama.cpp)（原版 llama.cpp 加载不了 PQ2_0；在 Zen 4 等 AVX-512 CPU 上，发布的二进制一加载就崩，见模型的 KNOWN_ISSUES）。
 
-推理所需的全部文件（底座 GGUF、视觉投影、适配器、校准）都在同一个模型仓库里，[Hugging Face](https://huggingface.co/dakebakery/Bonsai-JEV) 和 [ModelScope](https://modelscope.cn/models/dakepeng/Bonsai-JEV) 同步发布（发布时上传）。底座就是 Prism ML 的原文件，和适配器验证时用的那份逐字节一致。
+推理所需的全部文件（底座 GGUF、视觉投影、适配器、校准）都在同一个模型仓库里，[Hugging Face](https://huggingface.co/dakebakery/Bonsai-JEV) 和 [ModelScope](https://modelscope.cn/models/dakepeng/Bonsai-JEV) 同步发布。底座就是 Prism ML 的原文件，和适配器验证时用的那份逐字节一致。
 
 ```bash
 pip install fastapi uvicorn requests pydantic pillow
