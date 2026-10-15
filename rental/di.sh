@@ -1,8 +1,9 @@
 #!/bin/bash
 # Decision Index 0.3 public suites (text + vision) for Bonsai-JEV on a rented 2x RTX PRO 6000 box (AutoDL).
-# GPU 0 serves the text suite (8 runner shards), GPU 1 the vision suite (kit's `decide` engine, 8 workers).
+# The last GPU serves the vision suite (kit's `decide` engine, 8 workers); every other GPU serves text (8 shards each).
 #   bash rental/di.sh setup     build the fork's llama-server, fetch the release weights from ModelScope, venv + DI kit
-#   bash rental/di.sh start     both decision services
+#   bash rental/di.sh start     decision services (text on GPUs 0..N-2, vision on the last)
+#   bash rental/di.sh cord      rebuild the CORD vision set on Linux (macOS Pillow re-encodes 2 images differently)
 #   bash rental/di.sh sample    100 text rows + 100 vision rows end to end (pipeline check, ~5 min)
 #   bash rental/di.sh full      full public suites in the background -> ~/bonsai/di/runs/{text,vision}
 #   bash rental/di.sh score     merge the text shards, score both
@@ -18,6 +19,7 @@ MIRROR=${PIP_MIRROR:-https://repo.huaweicloud.com/repository/pypi/simple}
 L=${LOCAL_ROOT:-$HOME/autodl-tmp/bonsai-local}; mkdir -p $L   # venv + build on the instance's own disk (network storage is slow for many small files)
 export PIP_NO_CACHE_DIR=1 LLAMA_BIN=$L/llama.cpp/build/bin VENV=$L/venv-di PATH=/usr/local/cuda/bin:/root/miniconda3/bin:$PATH
 log() { echo "[$(date +%H:%M:%S)] $*"; }
+NG=$(nvidia-smi -L 2>/dev/null | wc -l); [ "$NG" -ge 2 ] || NG=2   # GPUs on this box (>= 2: text + vision)
 
 case "${1:-}" in
 setup)
@@ -45,15 +47,26 @@ setup)
   log "setup done"
   ;;
 start)
+  # last GPU serves the vision suite (port 8001); every other GPU serves text (ports 8010, 8011, ...)
   cd $J
-  CUDA_VISIBLE_DEVICES=0 LPORT=8080 PORT=8000 CTX=262144 NP=8 bash run_decide.sh start $W | tail -1   # 8 slots x 32k (text)
-  CUDA_VISIBLE_DEVICES=1 LPORT=8081 PORT=8001 CTX=131072 NP=8 bash run_decide.sh start $W | tail -1   # 8 slots x 16k (vision)
+  for g in $(seq 0 $((NG - 2))); do
+    CUDA_VISIBLE_DEVICES=$g LPORT=$((8090 + g)) PORT=$((8010 + g)) CTX=262144 NP=8 bash run_decide.sh start $W | tail -1   # 8 slots x 32k
+  done
+  CUDA_VISIBLE_DEVICES=$((NG - 1)) LPORT=8081 PORT=8001 CTX=131072 NP=8 bash run_decide.sh start $W | tail -1              # 8 slots x 16k
   nvidia-smi --query-gpu=index,memory.used --format=csv,noheader
+  ;;
+cord)
+  # CORD's two oversized images re-encode differently with macOS Pillow; rebuild that one set here (Linux) and verify
+  cd $DI; . $VENV/bin/activate; [ -f /etc/network_turbo ] && . /etc/network_turbo
+  python -m decision_index suite rebuild --vision --sets full_cord --work $DI/vision-work > $DI/cord.log 2>&1
+  rm -rf $DI/vision/full/full_cord && cp -r $DI/vision-work/vision/full/full_cord $DI/vision/full/
+  python -c "from decision_index.vision import rows; rows.write_rows('$DI/vision')"
+  python -m decision_index vision verify --dir $DI/vision | tail -3
   ;;
 sample)
   cd $J; . $VENV/bin/activate; mkdir -p $DI/runs
   python -m decision_index suite sample --dir $DI/suite-0.3 --n 100 --out $DI/sample-100.jsonl.gz
-  python -m decision_index run --engine di_engine:BonsaiJEV --option base_url=http://127.0.0.1:8000 \
+  python -m decision_index run --engine di_engine:BonsaiJEV --option base_url=http://127.0.0.1:8010 \
     --rows $DI/sample-100.jsonl.gz --out $DI/runs/text-sample --fresh | tail -c 600; echo
   python -m decision_index score --results $DI/runs/text-sample/results.jsonl --suite-dir $DI/suite-0.3 --edition 0.3 | head -c 600; echo
   python -m decision_index vision run --dir $DI/vision --engine decide --option base_url=http://127.0.0.1:8001 \
@@ -61,19 +74,21 @@ sample)
   grep -c '"status": "ok"' $DI/runs/text-sample/results.jsonl $DI/runs/vision-sample/results.jsonl || true
   ;;
 full)
+  # 8 runner shards per text GPU, shard i -> text server i mod (NG - 1)
   cd $J; . $VENV/bin/activate; mkdir -p $DI/runs/text $DI/runs/vision
-  [ -d $DI/shards ] || python di_shard.py --suite-dir $DI/suite-0.3 --n 8 --out $DI/shards
-  for i in 0 1 2 3 4 5 6 7; do
-    setsid nohup python -m decision_index run --engine di_engine:BonsaiJEV --option base_url=http://127.0.0.1:8000 \
+  NT=$((NG - 1)); NS=$((8 * NT))
+  [ -d $DI/shards ] || python di_shard.py --suite-dir $DI/suite-0.3 --n $NS --out $DI/shards
+  for i in $(seq 0 $((NS - 1))); do
+    setsid nohup python -m decision_index run --engine di_engine:BonsaiJEV --option base_url=http://127.0.0.1:$((8010 + i % NT)) \
       --rows $DI/shards/rows-$i.jsonl.gz --out $DI/runs/text/$i > $DI/runs/text/$i.log 2>&1 < /dev/null &
   done
   setsid nohup python -m decision_index vision pipeline --dir $DI/vision --engine decide \
     --option base_url=http://127.0.0.1:8001 --workers 8 --out $DI/runs/vision > $DI/runs/vision.log 2>&1 < /dev/null &
-  log "started 8 text shards + vision"
+  log "started $NS text shards on $NT GPU(s) + vision"
   ;;
 score)
   cd $J; . $VENV/bin/activate
-  cat $DI/runs/text/[0-7]/results.jsonl > $DI/runs/text/results.jsonl
+  cat $DI/runs/text/[0-9]*/results.jsonl > $DI/runs/text/results.jsonl
   python -m decision_index score --results $DI/runs/text/results.jsonl --suite-dir $DI/suite-0.3 --edition 0.3 --engine bonsai-jev
   python -m decision_index vision score --dir $DI/vision --results $DI/runs/vision/results.jsonl
   ;;
