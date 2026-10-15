@@ -83,9 +83,9 @@ for mode in none cpu gpu; do
     ( while true; do /usr/lib/wsl/lib/nvidia-smi --query-gpu=memory.used --format=csv,noheader,nounits; sleep 1; done ) > /tmp/vram_$mode.txt 2>/dev/null & SP=$!
     if [ $mode = none ]; then python3 latency_bench.py --no-images --out results/final_8gb_$mode; else python3 latency_bench.py --out results/final_8gb_$mode; fi
     kill $SP; echo "peak used incl. the ${HOLD} MiB hold: $(sort -n /tmp/vram_$mode.txt | tail -1) MiB"
-    grep -iE "out of memory|failed to allocate|cudaMalloc" results/llama_server.log | head -3
+    grep -iE "out of memory|failed to allocate|cudaMalloc" results/llama_server_8080.log | head -3
   else
-    echo "server failed to start (likely out of memory):"; grep -iE "memory|alloc|error" results/llama_server.log | tail -5
+    echo "server failed to start (likely out of memory):"; grep -iE "memory|alloc|error" results/llama_server_8080.log | tail -5
   fi
 done
 stop_all; kill $HP 2>/dev/null; rm -f /tmp/hold.ready

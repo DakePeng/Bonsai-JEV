@@ -16,10 +16,10 @@ PORT=${PORT:-8000}
 mkdir -p results
 
 stop() {
-  pkill -f "[l]lama-server .*--port $LPORT"; pkill -f "[u]vicorn decide_server"
+  pkill -f "[l]lama-server .*--port $LPORT"; pkill -f "[u]vicorn decide_server:app .*--port $PORT"
   # wait until both ports are free, else the next start fails to bind (llama-server takes seconds to release VRAM)
-  for i in $(seq 60); do pgrep -f "[l]lama-server .*--port $LPORT|[u]vicorn decide_server" > /dev/null || break; sleep 1; done
-  pkill -9 -f "[l]lama-server .*--port $LPORT"; pkill -9 -f "[u]vicorn decide_server"; sleep 1; echo "stopped"
+  for i in $(seq 60); do pgrep -f "[l]lama-server .*--port $LPORT|[u]vicorn decide_server:app .*--port $PORT" > /dev/null || break; sleep 1; done
+  pkill -9 -f "[l]lama-server .*--port $LPORT"; pkill -9 -f "[u]vicorn decide_server:app .*--port $PORT"; sleep 1; echo "stopped"
 }
 
 case "${1:-start}" in
@@ -42,16 +42,16 @@ case "${1:-start}" in
     # --cache-ram / --cache-reuse: keep evicted prompts in RAM and reuse partial prefixes (KNOWN_ISSUES.md).
     setsid nohup $BIN/llama-server -m $M/$BASE $MM \
       $LORA -ngl 99 -c ${CTX:-8192} -np ${NP:-2} --cache-ram 16384 --cache-reuse 256 --port $LPORT --host 127.0.0.1 \
-      > results/llama_server.log 2>&1 < /dev/null &
+      > results/llama_server_$LPORT.log 2>&1 < /dev/null &
     for i in $(seq 1 60); do curl -sf http://127.0.0.1:$LPORT/health > /dev/null && break; sleep 2; done
-    curl -sf http://127.0.0.1:$LPORT/health > /dev/null || { echo "llama-server failed, see results/llama_server.log"; exit 1; }
+    curl -sf http://127.0.0.1:$LPORT/health > /dev/null || { echo "llama-server failed, see results/llama_server_$LPORT.log"; exit 1; }
     # adapter OFF globally (System 2 = untouched base); decide_server switches it on per decision request.
     # --lora-init-without-apply alone does not take effect in this fork's server, so set it explicitly.
     [ -n "$ADAPTER" ] && curl -sf -X POST http://127.0.0.1:$LPORT/lora-adapters -H "content-type: application/json" \
       -d '[{"id": 0, "scale": 0}]' > /dev/null && echo "adapter loaded, global scale 0: $(curl -s http://127.0.0.1:$LPORT/lora-adapters)"
     VENV=${VENV:-~/bonsai/venv}; [ -f "$VENV/bin/activate" ] && . "$VENV/bin/activate"
     LLAMA_URL=http://127.0.0.1:$LPORT DECISION_JSON=$DJ setsid nohup uvicorn decide_server:app --host 0.0.0.0 --port $PORT \
-      > results/decide_server.log 2>&1 < /dev/null &
+      > results/decide_server_$PORT.log 2>&1 < /dev/null &
     for i in $(seq 1 30); do curl -sf http://127.0.0.1:$PORT/health > /dev/null && break; sleep 1; done
     curl -s http://127.0.0.1:$PORT/health; echo
     echo "decide service on :$PORT (llama-server :$LPORT, adapter: ${ADAPTER:-none})"

@@ -40,6 +40,29 @@ def marker():
 
 
 LETTERS = "ABCDEFGHIJKLMNOP"
+MAX_OPTIONS = 255
+_wide = None
+
+
+def wide_labels():
+    """Labels and token ids beyond the 16 the head was trained on (JEV's "wide-labels"): Q-Z, then two-letter labels
+    that are one token in this tokenizer (AA, AB, ...). Read the same way; no head bias for them."""
+    global _wide
+    if _wide is None:
+        import string
+        cands = list("QRSTUVWXYZ") + [a + b for a in string.ascii_uppercase for b in string.ascii_uppercase]
+        _wide = []
+        for c in cands:
+            t = _http.post(f"{LLAMA_URL}/tokenize", json={"content": c, "add_special": False}, timeout=10).json()["tokens"]
+            if len(t) == 1:
+                _wide.append((c, t[0]))
+            if len(_wide) == MAX_OPTIONS - 16:
+                break
+    return _wide
+
+
+def labels(n):
+    return list(LETTERS[:n]) + [c for c, _ in wide_labels()[:max(0, n - 16)]]
 MODEL_NAME = os.environ.get("DECIDE_MODEL_NAME", "bonsai2-27b-decision")
 
 _dj = os.environ.get("DECISION_JSON")
@@ -78,7 +101,7 @@ def render(kind, state, question, options):
             text += marker()
         else:
             text += as_text(p)
-    lines = options if kind != "choice" else [f"{LETTERS[i]}) {o}" for i, o in enumerate(options)]
+    lines = options if kind != "choice" else [f"{lab}) {o}" for lab, o in zip(labels(len(options)), options)]
     prompt = f"[kind] {kind}\n[state] {text}\n[question] {question}\n[options]\n" + "\n".join(lines) + "\n[decision]:"
     return prompt, images
 
@@ -124,10 +147,11 @@ def decide(req: DecideRequest):
     if kind not in RANGES:
         raise HTTPException(400, f"kind must be one of {list(RANGES)}")
     options = {"noul": ["false", "true"], "score": [str(i) for i in range(6)]}.get(kind, req.options)
-    if not options or (kind == "choice" and not 2 <= len(options) <= 16):
-        raise HTTPException(400, "choice needs 2-16 options")
+    if not options or (kind == "choice" and not 2 <= len(options) <= MAX_OPTIONS):
+        raise HTTPException(400, f"choice needs 2-{MAX_OPTIONS} options")
     lo, _ = RANGES[kind]
-    ids = VERBALIZER_IDS[lo:lo + len(options)]
+    ids = VERBALIZER_IDS[lo:lo + min(len(options), 16)] + [t for _, t in wide_labels()[:max(0, len(options) - 16)]]
+    bias = [BIAS[lo + i] if i < 16 else 0.0 for i in range(len(ids))]
     prompt, images = render(kind, req.state, req.question, options)
     body = {
         "prompt": {"prompt_string": prompt, "multimodal_data": images} if images else prompt,
@@ -146,7 +170,7 @@ def decide(req: DecideRequest):
         raise HTTPException(502, f"llama-server returned no probabilities: {str(j)[:300]}")
     top = {t["id"]: t["logprob"] for t in j["completion_probabilities"][0]["top_logprobs"]}
     floor = min(top.values()) - 1.0                      # a verbalizer outside the top-N is below the N-th
-    z = [top.get(t, floor) + BIAS[lo + i] for i, t in enumerate(ids)]
+    z = [top.get(t, floor) + b for t, b in zip(ids, bias)]
     T = TEMPS.get(kind, 1.0)
     m = max(z)
     e = [math.exp((v - m) / T) for v in z]
@@ -154,8 +178,9 @@ def decide(req: DecideRequest):
     ci = max(range(len(probs)), key=lambda i: probs[i])
     out = {"kind": kind, "options": options, "probabilities": probs, "choice_index": ci, "choice": options[ci],
            "elapsed_seconds": round(time.time() - t0, 4), "n_prompt_tokens": j.get("timings", {}).get("prompt_n"),
-           "n_cached": j.get("timings", {}).get("cache_n"), "model": MODEL_NAME, "protocol": "jev27-bare-v1"}
+           "n_cached": j.get("timings", {}).get("cache_n"), "model": MODEL_NAME, "protocol": "jev27-bare-v1",
+           "adaptation": "native" if len(options) <= 16 else "wide-labels"}
     if req.debug:
-        out["debug"] = {"logprobs": [top.get(t) for t in ids], "bias": BIAS[lo:lo + len(ids)], "temperature": T,
+        out["debug"] = {"logprobs": [top.get(t) for t in ids], "bias": bias, "temperature": T,
                         "missing_from_topn": [t for t in ids if t not in top], "timings": j.get("timings")}
     return out
