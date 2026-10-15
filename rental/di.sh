@@ -50,15 +50,16 @@ start)
   # last GPU serves the vision suite (port 8001); every other GPU serves text (ports 8010, 8011, ...)
   cd $J
   for g in $(seq 0 $((NG - 2))); do
-    CUDA_VISIBLE_DEVICES=$g LPORT=$((8090 + g)) PORT=$((8010 + g)) CTX=262144 NP=8 bash run_decide.sh start $W | tail -1   # 8 slots x 32k
+    CUDA_VISIBLE_DEVICES=$g LPORT=$((8090 + g)) PORT=$((8010 + g)) CTX=$((32768 * ${NP_TEXT:-16})) NP=${NP_TEXT:-16} bash run_decide.sh start $W | tail -1   # NP_TEXT slots x 32k
   done
   CUDA_VISIBLE_DEVICES=$((NG - 1)) LPORT=8081 PORT=8001 CTX=131072 NP=8 bash run_decide.sh start $W | tail -1              # 8 slots x 16k
   nvidia-smi --query-gpu=index,memory.used --format=csv,noheader
   ;;
 cord)
   # CORD's two oversized images re-encode differently with macOS Pillow; rebuild that one set here (Linux) and verify
-  cd $DI; . $VENV/bin/activate; [ -f /etc/network_turbo ] && . /etc/network_turbo
-  python -m decision_index suite rebuild --vision --sets full_cord --work $DI/vision-work > $DI/cord.log 2>&1
+  # the box cannot reach the Hub: put the two pinned parquets in $DI/vision-work/vision-downloads/full_cord first
+  cd $DI; . $VENV/bin/activate; export HF_HUB_OFFLINE=1 HF_HUB_DISABLE_XET=1
+  python -m decision_index suite rebuild --vision --sets full_cord --keep-downloads --work $DI/vision-work > $DI/cord.log 2>&1
   rm -rf $DI/vision/full/full_cord && cp -r $DI/vision-work/vision/full/full_cord $DI/vision/full/
   python -c "from decision_index.vision import rows; rows.write_rows('$DI/vision')"
   python -m decision_index vision verify --dir $DI/vision | tail -3
@@ -74,9 +75,9 @@ sample)
   grep -c '"status": "ok"' $DI/runs/text-sample/results.jsonl $DI/runs/vision-sample/results.jsonl || true
   ;;
 full)
-  # 8 runner shards per text GPU, shard i -> text server i mod (NG - 1)
+  # SHARDS_PER_GPU runner shards per text GPU (default 16 = NP_TEXT), shard i -> text server i mod (NG - 1)
   cd $J; . $VENV/bin/activate; mkdir -p $DI/runs/text $DI/runs/vision
-  NT=$((NG - 1)); NS=$((8 * NT))
+  NT=$((NG - 1)); NS=$((${SHARDS_PER_GPU:-16} * NT))
   [ -d $DI/shards ] || python di_shard.py --suite-dir $DI/suite-0.3 --n $NS --out $DI/shards
   for i in $(seq 0 $((NS - 1))); do
     setsid nohup python -m decision_index run --engine di_engine:BonsaiJEV --option base_url=http://127.0.0.1:$((8010 + i % NT)) \

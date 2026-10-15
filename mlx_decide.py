@@ -1,7 +1,7 @@
 """mlx_decide.py - Bonsai-JEV on Apple Silicon: Prism's MLX 2-bit pack + our LoRA and decision head, no conversion.
 
-Prism's pack (prism-ml/Ternary-Bonsai-2-27B-mlx-2bit) is mlx-lm's qwen3_5 TextModel whose linear layers are `Packed`
-modules: Hadamard-rotate the input, then a 2-bit quantized matmul (lossless transcode of PQ2_0), with HF's grouped
+Prism's pack (prism-ml/Ternary-Bonsai-2-27B-mlx-2bit, schema 2) is mlx-vlm's qwen3_5 Model whose language-model
+linear layers are `Packed` modules: Hadamard-rotate the input, then a 2-bit quantized matmul (lossless transcode of PQ2_0), with HF's grouped
 GDN layout. Our peft LoRA was trained on the raw (un-rotated) layer input in that same layout, so it wraps each
 Packed module as base(x) + (x A^T) B^T * alpha/r with no math, and the decision head (fp32 24 x 5120 + bias) reads
 the final normed hidden state directly. Temperatures come from decision.json.
@@ -33,8 +33,9 @@ class LoRA(nn.Module):
 
 def load(pack, adapter):
     sys.path.insert(0, os.path.join(pack, "runtime"))
-    from artifact import load_model
-    model, _ = load_model(pack)
+    from vision_artifact import load_vl_model
+    vl, proc, _ = load_vl_model(pack)
+    model = vl.language_model          # .model.layers[...] holds the Packed text layers; vl.vision_tower stays as shipped
     cfg = json.load(open(os.path.join(adapter, "peft", "adapter_config.json")))
     scale = cfg["lora_alpha"] / cfg["r"]
     w = mx.load(os.path.join(adapter, "peft", "adapter_model.safetensors"))
@@ -53,7 +54,26 @@ def load(pack, adapter):
     from tokenizers import Tokenizer
     tok = Tokenizer.from_file(os.path.join(pack, "tokenizer.json"))
     mx.eval(model.parameters())
+    model.vl, model.proc = vl, proc
     return model, head, dec, tok, n
+
+
+MARKER = "<__media__>"     # where an image goes in a prompt (the fork's marker); becomes vision_start + patches + vision_end
+IMG = "<|vision_start|><|image_pad|><|vision_end|>"
+
+
+def head_logits_mm(model, head, prompt, images):
+    """prompt with one MARKER per image; images: file paths. Native resolution through the pack's Qwen2-VL processor."""
+    from PIL import Image
+    inp = model.proc(text=[prompt.replace(MARKER, IMG)], images=[Image.open(p).convert("RGB") for p in images],
+                     padding=False, return_tensors="np")
+    ids = mx.array(inp["input_ids"])
+    emb = model.vl.get_input_embeddings(ids, mx.array(inp["pixel_values"]), image_grid_thw=mx.array(inp["image_grid_thw"]))
+    out = model(ids, inputs_embeds=emb.inputs_embeds, cache=model.make_cache(), return_hidden=True, skip_logits=True)
+    h = out.hidden_states[-1][0, -1].astype(mx.float32)
+    z = head["weight"] @ h + head["bias"]
+    mx.eval(z)
+    return z.tolist(), ids.shape[1]
 
 
 def as_text(x):
@@ -67,7 +87,8 @@ def render(kind, state, question, options):
 
 def head_logits(model, head, tok, prompt):
     ids = tok.encode(prompt, add_special_tokens=False).ids
-    h = model.model(mx.array([ids]))[0, -1].astype(mx.float32)
+    out = model(mx.array([ids]), cache=model.make_cache(), return_hidden=True, skip_logits=True)
+    h = out.hidden_states[-1][0, -1].astype(mx.float32)          # final RMSNorm output at [decision]:
     z = head["weight"] @ h + head["bias"]
     mx.eval(z)
     return z.tolist(), len(ids)
@@ -99,11 +120,34 @@ def main():
     ap.add_argument("--pack", required=True, help="prism-ml/Ternary-Bonsai-2-27B-mlx-2bit download dir")
     ap.add_argument("--adapter", required=True, help="dir with peft/, head.safetensors, decision.json")
     ap.add_argument("--validate", help="jsonl rows {kind, state, question, options, target, fork_logits} exported from the fork")
+    ap.add_argument("--validate-vlrb", help="jsonl rows {prompt, image, fork_ab} (VL-RewardBench, both orders per pair)")
     ap.add_argument("--limit", type=int, default=0)
     a = ap.parse_args()
     t0 = time.time()
     model, head, dec, tok, n = load(a.pack, a.adapter)
     print(f"loaded pack + {n} LoRA modules in {time.time() - t0:.1f}s; peak memory {mx.get_peak_memory() / 2**30:.2f} GiB", flush=True)
+    if a.validate_vlrb:
+        rows = [json.loads(l) for l in open(a.validate_vlrb)]
+        rows = rows[:a.limit] if a.limit else rows
+        T = dec["per_kind_temperature"]["choice"]
+        b8, b9 = dec["head_bias"][8], dec["head_bias"][9]
+        pa_m, pa_f, secs, toks = [], [], [], []
+        for r in rows:
+            t = time.time()
+            z, ntok = head_logits_mm(model, head, r["prompt"], [os.path.join(os.path.dirname(a.validate_vlrb), r["image"])])
+            secs.append(time.time() - t)
+            toks.append(ntok)
+            pa_m.append(1 / (1 + math.exp((z[9] - z[8]) / T)))
+            za, zb = r["fork_ab"]
+            pa_f.append(1 / (1 + math.exp(((zb + b9) - (za + b8)) / T)))
+        n = len(rows)
+        agree = sum((x > 0.5) == (y > 0.5) for x, y in zip(pa_m, pa_f))
+        s = sorted(secs)
+        print(f"{n} image prompts | P(A) MLX vs fork: mean |dp| {sum(abs(x - y) for x, y in zip(pa_m, pa_f)) / n:.4f}, "
+              f"max |dp| {max(abs(x - y) for x, y in zip(pa_m, pa_f)):.4f}, same verdict {100 * agree / n:.1f}%")
+        print(f"latency p50 {s[n // 2]:.2f}s p95 {s[int(0.95 * (n - 1))]:.2f}s, median prompt tokens {sorted(toks)[n // 2]}, "
+              f"peak memory {mx.get_peak_memory() / 2**30:.2f} GiB")
+        return
     if not a.validate:
         print(decide(model, head, dec, tok, "noul", "The robot holds a red cube above an empty bin.", "Should it release the cube now?"))
         return
