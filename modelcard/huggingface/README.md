@@ -33,7 +33,7 @@ tags:
 
 The same weights also serve **System 2**: with the adapter switched off, the server is Ternary Bonsai 2 itself, byte for byte.
 
-> **Status (2026-10-15):** trained; all numbers below are measured through the deployment path (the fork running `adapter.gguf` on the ternary file). The Decision Index run is pending.
+> **Status (2026-10-15):** trained; all numbers below are measured through the deployment path (the fork running `adapter.gguf` on the ternary file). Decision Index: public vision suite 67.56 (level with d3-mini); text suite not run.
 
 > **Independent project.** Bonsai-JEV is built by an independent developer. It is not affiliated with, endorsed by, or sponsored by AutoTrust (autotrust), TypeSafe, or Prism ML. Their names appear only to credit their work and to identify the models and data this project builds on; all trademarks belong to their owners.
 
@@ -91,6 +91,8 @@ A tie with JEV-27B-VL (±2.4 at 1,247 pairs). One forward pass without averaging
 Order-agree is the share of pairs whose verdict survives swapping the two answers; it shows whether a single forward pass can be trusted.
 
 **Embodied reasoning**, [ERQA](https://github.com/embodiedreasoning/ERQA) (400 robot-scene questions, one pass, JEV-35B protocol): **52.0** (JEV-27B-VL 53.8, JEV-35B 51.3; chance ≈ 26, ±5 at 400 questions); 56.1 on single-image and 41.6 on multi-image questions.
+
+**[Decision Index](https://huggingface.co/spaces/multimodalart/jev-decision-index) 0.3, public vision suite** (12,210 rows, official kit, chance-corrected; compare with the board's public column): **67.56**, level with vLLM-SR d3-mini 4B (67.67, ~9 GB) and 93% of JEV-27B-VL (72.80, ~56 GB); d3 27B 74.08, d3-flash 9B 69.87. Within 5% of JEV-27B-VL on documents, receipts, web pages and spatial questions (InfographicVQA 95.6 vs 96.7, KIE 90.0 vs 92.0, Mind2Web 75.3 vs 78.6, CV-Bench 73.3 vs 76.8); ~70% on multi-step visual reasoning (MMMU-Pro 28.8 vs 40.1, R-Bench-M 21.3 vs 31.1). Text suite not run. Single-request latency on one RTX PRO 6000 (the board's rule: median, mean and p80 ≤ 1 s): vision median 986 ms / p80 1,289 ms, text median 654 ms / mean 3,143 ms, so the model is not submitted to the board; the ternary fork is built for small memory, not large-GPU speed.
 
 **Agent judges** (zero-shot, JEV-27B-DEMO prompts): AgentRewardBench AUROC **0.930** (JEV-27B-VL 0.91), precision / recall at 0.5 74.7 / 74.7 (78.4 / 70.2); Plan-RewardBench macro accuracy **74.7** (73.2). **[JevBench-231](https://github.com/fstandhartinger/jevbench)**: 194 / 231 with JEV's `bare-v1` prompt, +28 over the zero-shot base with the same prompt.
 
@@ -194,7 +196,8 @@ Code, alignment checks and the full log of decisions: [GitHub](https://github.co
 - **Same teacher as JEV**, so on text it matches JEV-27B rather than exceeding it. Transfer to unseen task families is weaker (KL 0.128 vs 0.104).
 - **Ternarisation costs more on vision than on text** (Bonsai's card: MMMU-Pro 81.7 → 75.5). Image decisions are zero-shot, as in JEV-27B-VL.
 - **English prompts.** The training data is English; decisions on other languages are untested.
-- **Latency:** each decision is a 27B forward pass; on Jetson Orin NX expect seconds per image decision.
+- **Latency:** each decision is a 27B forward pass; on an RTX PRO 6000 it is 2–4× slower than JEV-27B-VL on vLLM (above the Decision Index's 1 s rule); on Jetson Orin NX expect seconds per image decision.
+- **Visual reasoning** is the weakest area (~70% of JEV-27B-VL on MMMU-Pro and R-Bench-M).
 
 ## License and acknowledgements
 

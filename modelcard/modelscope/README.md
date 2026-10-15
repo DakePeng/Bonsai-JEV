@@ -30,7 +30,7 @@ tags:
 
 同一套权重也提供 **System 2**：把适配器关掉，服务就是 Ternary Bonsai 2 本身，逐字节一致。
 
-> **状态（2026-10-15）：** 已训练完成；下面的数字都是在部署路径上测的（分支在三值文件上跑 `adapter.gguf`）。Decision Index 还没跑。
+> **状态（2026-10-15）：** 已训练完成；下面的数字都是在部署路径上测的（分支在三值文件上跑 `adapter.gguf`）。Decision Index：公开视觉套件 67.56（和 d3-mini 持平）；文本套件没跑。
 
 [English model card on Hugging Face](https://huggingface.co/dakebakery/Bonsai-JEV)
 
@@ -90,6 +90,8 @@ JEV-27B 模型卡上的其他指标，同样的行、同样的定义：
 顺序一致率是把两个回答换位后结论不变的比例，反映单次前向的结果是否可信。
 
 **具身推理**，[ERQA](https://github.com/embodiedreasoning/ERQA)（400 道机器人场景题，单次前向，JEV-35B 的协议）：**52.0**（JEV-27B-VL 53.8，JEV-35B 51.3；随机约 26，400 题置信区间约 ±5）；单图题 56.1，多图题 41.6。
+
+**[Decision Index](https://huggingface.co/spaces/multimodalart/jev-decision-index) 0.3 公开视觉套件**（12,210 题，官方评测包，随机水平校正；和榜上的公开分一列比）：**67.56**，和 vLLM-SR d3-mini 4B（67.67，约 9 GB）持平，是 JEV-27B-VL（72.80，约 56 GB）的 93%；d3 27B 74.08，d3-flash 9B 69.87。文档、票据、网页和空间类题目和 JEV-27B-VL 差距在 5% 以内（InfographicVQA 95.6 对 96.7、KIE 90.0 对 92.0、Mind2Web 75.3 对 78.6、CV-Bench 73.3 对 76.8）；多步视觉推理约为它的 70%（MMMU-Pro 28.8 对 40.1、R-Bench-M 21.3 对 31.1）。文本套件没跑。一张 RTX PRO 6000 上单发的延迟（榜单规则：中位数、平均、80 分位都 ≤ 1 秒）：视觉中位数 986 ms、80 分位 1,289 ms，文本中位数 654 ms、平均 3,143 ms，所以没有提交到榜单；这个三值分支是为小显存设计的，不是为大卡的速度。
 
 **Agent 评判**（零样本，JEV-27B-DEMO 的提示词）：AgentRewardBench AUROC **0.930**（JEV-27B-VL 0.91），阈值 0.5 时精确率 / 召回率 74.7 / 74.7（78.4 / 70.2）；Plan-RewardBench 宏平均准确率 **74.7**（73.2）。**[JevBench-231](https://github.com/fstandhartinger/jevbench)**：用 JEV 的 `bare-v1` 提示词答对 194 / 231，比同一提示词下的零样本底座多 28 题。
 
@@ -194,7 +196,8 @@ LoRA r=16、α=32、dropout 0.05，挂在全部 64 层的 `in_proj_qkv, in_proj_
 - **和 JEV 同一个教师**，文本上和 JEV-27B 持平，不会超过它。迁移到没见过的任务族更弱（KL 0.128 对 0.104）。
 - **三值化对视觉的伤害大于文本**（Bonsai 的模型卡：MMMU-Pro 81.7 → 75.5）。看图决策和 JEV-27B-VL 一样是零样本。
 - **英文提示词。** 训练数据是英文；其他语言（包括中文）的决策质量未测。
-- **延迟：** 每次决策是一次 27B 的前向；Jetson Orin NX 上一次看图决策预计几秒。
+- **延迟：** 每次决策是一次 27B 的前向；在 RTX PRO 6000 上比 vLLM 跑的 JEV-27B-VL 慢 2–4 倍（超过 Decision Index 1 秒的门槛）；Jetson Orin NX 上一次看图决策预计要几秒。
+- **视觉推理**是最弱的一块（MMMU-Pro 和 R-Bench-M 约为 JEV-27B-VL 的 70%）。
 
 ## 许可证和致谢
 

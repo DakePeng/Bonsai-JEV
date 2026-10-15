@@ -24,7 +24,7 @@ Bonsai-JEV 就是把 JEV 的配方用在 Bonsai 2 底座上；两部分思路的
 
 另外感谢 **ChezRD 的 [bonjev](https://github.com/ChezRD/bonjev)**（MIT），一条更早的、不训练的 Ternary Bonsai 决策路线：一个基于 Prism llama.cpp 库的 Rust 引擎，把现成的决策 LoRA 增量组合起来。它公开的 [JevBench-231](https://github.com/fstandhartinger/jevbench) 和 Decision Index 评测协议与成绩，是我们对照的外部基准（`jevbench_eval.py` 的判分方式和它的考试完全一致）。
 
-> **状态（2026-10-15）：已训练完成，并在部署路径（分支 + 三值底座上的 `adapter.gguf`）上评测完毕。** Decision Index 还没跑。
+> **状态（2026-10-15）：已训练完成，并在部署路径（分支 + 三值底座上的 `adapter.gguf`）上评测完毕。** Decision Index：跑了公开视觉套件（67.56，和 d3-mini 持平）；文本套件没跑。
 
 ## 结果
 
@@ -108,6 +108,38 @@ Google DeepMind 随 Gemini Robotics 发布的机器人场景基准。协议和 J
 | 其他 | 14 | 21.4 | 21.4 |
 
 JEV-27B-VL（公开）：单次前向 53.8，打开思考 61.5。我们单图题 56.1%，113 道多图题 41.6%，跨视角对应是弱项。4070 上每题 p50 1.6 秒。
+
+### Decision Index 0.3 公开视觉套件
+
+[Jev Decision Index](https://huggingface.co/spaces/multimodalart/jev-decision-index) 的视觉榜，用官方[评测包](https://github.com/apolinario/decision-index)跑（`decide` 引擎接我们的 `/v1/decide`）：11 个测试共 12,210 道选择题，图片按原分辨率、上限 1.6 MP，分数做随机水平校正（0 = 瞎猜，100 = 全对）。题库从固定版本的数据源重建，和榜单的题目（run id 与题目内容哈希）完全一致。榜单之外只能跑公开的一半，所以要和榜上的*公开分*一列比，不是 Full 分。
+
+| 模型 | 显存中的权重 | 视觉公开分 |
+|---|---:|---:|
+| vLLM-SR d3 27B | 约 54 GB | 74.08 |
+| JEV-27B-VL | 约 56 GB | 72.80 |
+| vLLM-SR d3-flash 9B | 约 17 GB | 69.87 |
+| vLLM-SR d3-mini 4B | 约 9 GB | 67.67 |
+| **Bonsai-JEV** | **约 7–8 GB** | **67.56** |
+
+各测试（随机水平校正后的分数）：
+
+| 测试 | **Bonsai-JEV** | JEV-27B-VL | d3 27B | d3-flash 9B | d3-mini 4B |
+|---|---:|---:|---:|---:|---:|
+| InfographicVQA | **95.6** | 96.7 | 97.8 | 96.2 | 94.5 |
+| KIE (CORD+FUNSD) | **90.0** | 92.0 | 92.6 | 92.9 | 92.2 |
+| Mind2Web | **75.3** | 78.6 | 83.3 | 80.8 | 77.5 |
+| CV-Bench | **73.3** | 76.8 | 76.4 | 75.4 | 73.9 |
+| Winoground | **78.2** | 84.5 | 85.8 | 82.8 | 81.5 |
+| RealWorldQA | **66.7** | 72.2 | 73.9 | 62.3 | 57.8 |
+| CharXiv | **71.7** | 79.7 | 79.5 | 73.9 | 73.9 |
+| BLINK | **55.2** | 63.3 | 60.2 | 56.0 | 53.4 |
+| Hateful Memes | **34.7** | 40.3 | 44.6 | 41.0 | 37.4 |
+| MMMU-Pro vision （权重 0.25） | **28.8** | 40.1 | 46.4 | 38.3 | 32.7 |
+| R-Bench-M （权重 0.5） | **21.3** | 31.1 | 33.4 | 20.8 | 18.8 |
+
+总分是 JEV-27B-VL 的 93%，和 d3-mini 持平（差 0.1），显存更小。读字、文档、网页、空间布局和 BF16 的 27B 差距在 5% 以内；多步视觉推理（MMMU-Pro、R-Bench-M）掉到约 70%，和 Bonsai 模型卡上三值化的影响一致。文本套件没跑：约 107 万次决策（一个请求最多带 64 个问题），用这个运行时在两张 RTX PRO 6000 上约 25 小时。
+
+**榜单延迟规则（没达到）。** 榜单要求在一张 RTX PRO 6000 上一次只发一个请求时，单请求延迟的中位数、平均数和 80 分位都 ≤ 1 秒。按这个方法各随机测 200 题：视觉中位数 986 ms、平均 964 ms、80 分位 1,289 ms；文本中位数 654 ms、平均 3,143 ms、80 分位 3,070 ms（多问题的请求拉高了平均）。JEV-27B-VL 在 vLLM 上的视觉中位数是 264 ms。PrismML 分支的三值内核在这张卡上约 2,300 token/秒，它是为小显存设备做的，不是为大卡的吞吐，所以这一版不提交到榜单。
 
 ### JevBench-231（top-1 准确率，按 bonjev 的判分方式）
 
@@ -232,7 +264,8 @@ LoRA r=16、α=32、dropout 0.05，挂在全部 64 层的 `in_proj_qkv, in_proj_
 - **质量天花板是 JEV 水平。** 三值底座只能挂 LoRA；同一个 Qwen3.8-27B 做全量微调的模型在 [Jev Decision Index](https://huggingface.co/spaces/multimodalart/jev-decision-index) 上到 62–66 分，JEV-27B 是 55.6。这个模型的意义在*内存*，不在超过它们。
 - **和 JEV 用同一个教师蒸馏**，文本上和 JEV-27B 持平，不会超过它。迁移到没见过的任务族更弱（OOD KL 0.128 对 0.104）。
 - **三值化对视觉的伤害大于文本**（Bonsai 自己的模型卡：MMMU-Pro 81.7 → 75.5）。看图决策和 JEV-27B-VL 一样是零样本；计划做一轮图片决策训练。
-- **延迟：** 一次决策要做一次 27B 的前向。Jetson Orin NX 上一次看图决策预计几秒。
+- **延迟：** 一次决策要做一次 27B 的前向。在大卡上比 vLLM 跑的 JEV-27B-VL 慢 2–4 倍（RTX PRO 6000 上视觉中位数 986 ms 对 264 ms），超过 Decision Index 1 秒的收录门槛。Jetson Orin NX 上一次看图决策预计几秒。
+- **视觉推理**是最弱的一块：MMMU-Pro 和 R-Bench-M 只有 JEV-27B-VL 的约 70%；计划中的图片决策训练就是针对这里。
 
 ## 仓库结构
 

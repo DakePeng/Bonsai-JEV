@@ -24,7 +24,7 @@ Bonsai-JEV is the JEV recipe applied to the Bonsai 2 base; credit for both ideas
 
 Also thanks to **[bonjev](https://github.com/ChezRD/bonjev) by ChezRD** (MIT), an earlier, training-free route to decisions on Ternary Bonsai: a Rust engine over the Prism llama.cpp libraries that combines existing decision-LoRA deltas. Its published [JevBench-231](https://github.com/fstandhartinger/jevbench) and Decision Index protocol and numbers are the external comparison we report against (`jevbench_eval.py` grades exactly like its exam).
 
-> **Status (2026-10-15): trained and evaluated through the deployment path** (fork + `adapter.gguf` on the ternary base). The Decision Index run is still pending.
+> **Status (2026-10-15): trained and evaluated through the deployment path** (fork + `adapter.gguf` on the ternary base). Decision Index: public vision suite run (67.56, level with d3-mini); the text suite was not run.
 
 ## Results
 
@@ -108,6 +108,38 @@ Google DeepMind's robot-scene benchmark (released with Gemini Robotics). Same pr
 | Other | 14 | 21.4 | 21.4 |
 
 JEV-27B-VL (published): 53.8 one pass, 61.5 with thinking. Ours is 56.1% on single-image questions and 41.6% on the 113 multi-image ones; cross-view correspondence is the weak spot. 4070: p50 1.6 s per question.
+
+### Decision Index 0.3, public vision suite
+
+The [Jev Decision Index](https://huggingface.co/spaces/multimodalart/jev-decision-index) vision board, run with its [kit](https://github.com/apolinario/decision-index) (`decide` engine against our `/v1/decide`): 12,210 multiple-choice rows over 11 benchmarks, images at native resolution capped at 1.6 MP, scores chance-corrected (0 = guessing, 100 = perfect). The suite was rebuilt from the pinned sources and matches the board's rows (run ids and payload hashes). Only the public half can be run outside the board, so compare with the board's *public* column, not its Full score.
+
+| Model | Weights in memory | Public vision index |
+|---|---:|---:|
+| vLLM-SR d3 27B | ~54 GB | 74.08 |
+| JEV-27B-VL | ~56 GB | 72.80 |
+| vLLM-SR d3-flash 9B | ~17 GB | 69.87 |
+| vLLM-SR d3-mini 4B | ~9 GB | 67.67 |
+| **Bonsai-JEV** | **~7–8 GB** | **67.56** |
+
+Per benchmark (chance-corrected skill):
+
+| Benchmark | **Bonsai-JEV** | JEV-27B-VL | d3 27B | d3-flash 9B | d3-mini 4B |
+|---|---:|---:|---:|---:|---:|
+| InfographicVQA | **95.6** | 96.7 | 97.8 | 96.2 | 94.5 |
+| KIE (CORD+FUNSD) | **90.0** | 92.0 | 92.6 | 92.9 | 92.2 |
+| Mind2Web | **75.3** | 78.6 | 83.3 | 80.8 | 77.5 |
+| CV-Bench | **73.3** | 76.8 | 76.4 | 75.4 | 73.9 |
+| Winoground | **78.2** | 84.5 | 85.8 | 82.8 | 81.5 |
+| RealWorldQA | **66.7** | 72.2 | 73.9 | 62.3 | 57.8 |
+| CharXiv | **71.7** | 79.7 | 79.5 | 73.9 | 73.9 |
+| BLINK | **55.2** | 63.3 | 60.2 | 56.0 | 53.4 |
+| Hateful Memes | **34.7** | 40.3 | 44.6 | 41.0 | 37.4 |
+| MMMU-Pro vision (weight 0.25) | **28.8** | 40.1 | 46.4 | 38.3 | 32.7 |
+| R-Bench-M (weight 0.5) | **21.3** | 31.1 | 33.4 | 20.8 | 18.8 |
+
+93% of JEV-27B-VL overall and level with d3-mini (−0.1) in less memory. Reading text, documents, web pages and spatial layout stays within 5% of the BF16 27B; multi-step visual reasoning (MMMU-Pro, R-Bench-M) drops to ~70%, as Bonsai's own card predicts for ternarisation. The text suite was not run: it is ~1.07M decisions (requests carry up to 64 questions), ~25 h on two RTX PRO 6000 with this runtime.
+
+**Board latency rule (not met).** The board admits models whose median, mean and 80th-percentile latency per request are ≤ 1 s on one RTX PRO 6000, one request at a time. Measured that way on 200 random rows each: vision median 986 ms, mean 964 ms, p80 1,289 ms; text median 654 ms, mean 3,143 ms, p80 3,070 ms (multi-question requests). JEV-27B-VL's vision median is 264 ms on vLLM. The PrismML fork's ternary kernels reach ~2,300 prompt tokens/s on this card: they are built for small-memory devices, not for large-GPU throughput, so this release is not submitted to the board.
 
 ### JevBench-231 (top-1 accuracy, bonjev's grading)
 
@@ -232,7 +264,8 @@ LoRA r=16, α=32, dropout 0.05 on `in_proj_qkv, in_proj_z, out_proj, q/k/v/o_pro
 - **Quality ceiling is JEV level.** The ternary base can only take a LoRA; full fine-tunes of the same Qwen3.8-27B reach 62–66 on the [Jev Decision Index](https://huggingface.co/spaces/multimodalart/jev-decision-index) where JEV-27B scores 55.6. This model is about *memory*, not about beating them.
 - **Distilled from the same teacher as JEV**, so on text it matches JEV-27B rather than exceeding it. Transfer to unseen task families is weaker (OOD KL 0.128 vs 0.104).
 - **Ternarisation costs more on vision than on text** (Bonsai's own card: MMMU-Pro 81.7 → 75.5). The image head is zero-shot, as in JEV-27B-VL; an image-decision training round is planned.
-- **Latency:** one decision costs the compute of a 27B forward pass. On Jetson Orin NX expect several seconds per image decision.
+- **Latency:** one decision costs the compute of a 27B forward pass. On a large GPU it is 2–4× slower than JEV-27B-VL on vLLM (vision median 986 ms vs 264 ms on an RTX PRO 6000), above the Decision Index's 1 s admission rule. On Jetson Orin NX expect several seconds per image decision.
+- **Visual reasoning** is the weakest area: ~70% of JEV-27B-VL on MMMU-Pro and R-Bench-M; the planned image-decision round targets it.
 
 ## Repository layout
 
