@@ -14,7 +14,8 @@ Ternary Bonsai 2 27B is copyright 2026-present Prism ML, Inc., available under t
   https://huggingface.co/prism-ml/Ternary-Bonsai-2-27B-gguf
 It is built from Qwen3.8-27B, Copyright 2026 Alibaba Cloud, available under the Apache 2.0 License.
 The base model weights are used unchanged as a frozen base. The GitHub repository does not contain them; the
-Hugging Face (dakebakery/Bonsai-JEV) and ModelScope (dakepeng/Bonsai-JEV) model repositories redistribute Prism ML's
+Hugging Face (dakebakery/Bonsai-JEV, dakebakery/Bonsai-JEV-mlx) and ModelScope (dakepeng/Bonsai-JEV,
+dakepeng/Bonsai-JEV-mlx) model repositories redistribute Prism ML's
 files byte-identical (SHA-256 verified against prism-ml/Ternary-Bonsai-2-27B-gguf) together with Prism ML's LICENSE
 and NOTICE (LICENSE-Ternary-Bonsai-2, NOTICE-Ternary-Bonsai-2.txt).
 The runtime is the PrismML fork of llama.cpp (MIT License, Copyright (c) 2023-2026 The ggml authors):
