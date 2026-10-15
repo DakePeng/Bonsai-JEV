@@ -158,8 +158,12 @@ def decide(req: DecideRequest):
         "n_predict": 1, "n_probs": 1000, "post_sampling_probs": False, "cache_prompt": True, **LORA_ON,
         "temperature": 1.0, "top_k": 0, "top_p": 1.0, "min_p": 0.0, "samplers": [],
     }
-    for attempt in range(2):   # ponytail: one retry. Rarely (~1/230 rows) the sampled token is a partial UTF-8 byte; llama-server then holds it back and returns no tokens and no probabilities. Re-sampling fixes it
+    for attempt in range(3):   # ponytail: resample up to twice. Rarely the sampled token is a partial UTF-8 byte (no probabilities returned) or a special token the output parser rejects (HTTP 500); only the logits matter, so re-sampling fixes both
         r = _http.post(f"{LLAMA_URL}/completion", json=body, timeout=600)
+        if r.status_code == 500 and "does not match the expected" in r.text:
+            # the sampled token tripped the server's output-format parser (e.g. a special token); only the logits matter
+            print(f"llama-server rejected the sampled token (attempt {attempt + 1}); resampling", flush=True)
+            continue
         if not r.ok:
             raise HTTPException(502, f"llama-server: {r.status_code} {r.text[:300]}")
         j = r.json()
@@ -167,7 +171,7 @@ def decide(req: DecideRequest):
             break
         print(f"llama-server returned no probabilities (attempt {attempt + 1}): {str(j)[:600]}", flush=True)
     else:
-        raise HTTPException(502, f"llama-server returned no probabilities: {str(j)[:300]}")
+        raise HTTPException(502, f"llama-server returned no probabilities after retries: {r.text[:300]}")
     top = {t["id"]: t["logprob"] for t in j["completion_probabilities"][0]["top_logprobs"]}
     floor = min(top.values()) - 1.0                      # a verbalizer outside the top-N is below the N-th
     z = [top.get(t, floor) + b for t, b in zip(ids, bias)]
