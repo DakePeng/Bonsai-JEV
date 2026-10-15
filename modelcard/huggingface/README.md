@@ -29,6 +29,8 @@ tags:
 
 **Code, training recipe and evaluation scripts:** [github.com/DakePeng/Bonsai-JEV](https://github.com/DakePeng/Bonsai-JEV) · Mirror: [ModelScope](https://modelscope.cn/models/dakepeng/Bonsai-JEV)
 
+> **About the "GGUF" panel on this page:** the Hub summarises the repo from the 230 MB `adapter_f16.gguf`, so it shows "0.1B params" and an "F16" variant. That file is the LoRA adapter (115M parameters). The model is the 27B ternary base, `Ternary-Bonsai-2-27B-PQ2_0.gguf` (listed as "Q2_0") or `-PTQ1_0.gguf` ("TQ1_0"); the Hub does not know Prism ML's PQ2_0/PTQ1_0 types and shortens their names.
+
 The same weights also serve **System 2**: with the adapter switched off, the server is Ternary Bonsai 2 itself, byte for byte.
 
 > **Status (2026-10-15):** trained; all numbers below are measured through the deployment path (the fork running `adapter.gguf` on the ternary file). JevBench-231, the agent-judge benchmarks and the Decision Index run are pending.
