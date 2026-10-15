@@ -2,7 +2,7 @@
 
 **A calibrated, image-capable 27B decision model that fits on an 8 GB GPU.** The [JEV](https://huggingface.co/autotrust/JEV-27B) recipe (LoRA + 24-slot decision head, distilled to soft labels) trained on top of [Ternary Bonsai 2 27B](https://huggingface.co/prism-ml/Ternary-Bonsai-2-27B-gguf), PrismML's ternary (−1/0/+1) compression of Qwen3.8-27B. The base stays ternary and frozen; the adapter is a separate file. One forward pass returns calibrated probabilities over the options of a typed question (yes/no, 0–5 score, or 2–16-way choice), with or without images.
 
-**Weights:** [Hugging Face · dakebakery/Bonsai-JEV](https://huggingface.co/dakebakery/Bonsai-JEV) · [ModelScope · dakepeng/Bonsai-JEV](https://modelscope.cn/models/dakepeng/Bonsai-JEV) (same files; ModelScope is faster from mainland China) · [中文说明](README.zh.md)
+**Weights:** [Hugging Face · dakebakery/Bonsai-JEV](https://huggingface.co/dakebakery/Bonsai-JEV) · [ModelScope · dakepeng/Bonsai-JEV](https://modelscope.cn/models/dakepeng/Bonsai-JEV) (same files; ModelScope is faster from mainland China) · **Apple Silicon (MLX):** [Hugging Face · dakebakery/Bonsai-JEV-mlx](https://huggingface.co/dakebakery/Bonsai-JEV-mlx) · [ModelScope · dakepeng/Bonsai-JEV-mlx](https://modelscope.cn/models/dakepeng/Bonsai-JEV-mlx) · [中文说明](README.zh.md)
 
 | | JEV-27B / JEV-27B-VL | **Bonsai-JEV** |
 |---|---|---|
@@ -149,7 +149,7 @@ Max context on 12 GB: ~24–32k tokens with f16 KV, ~48–60k with q8_0 KV (only
 
 | | Mac mini M4, 16 GB (MLX) | Ryzen 7 8745H + Radeon 780M iGPU (Vulkan) |
 |---|---|---|
-| How | Prism's [MLX 2-bit pack](https://huggingface.co/prism-ml/Ternary-Bonsai-2-27B-mlx-2bit) + our peft LoRA and head, no conversion (`mlx_decide.py`, `mlx_serve.py`) | PTQ1_0 + `adapter_f16.gguf` on the fork's Vulkan backend, `CACHE_RAM=2048` |
+| How | [Bonsai-JEV-mlx](https://huggingface.co/dakebakery/Bonsai-JEV-mlx): Prism's MLX 2-bit pack + our peft LoRA and head, no conversion (`mlx_decide.py`, `mlx_serve.py`) | PTQ1_0 + `adapter_f16.gguf` on the fork's Vulkan backend, `CACHE_RAM=2048` |
 | Agreement with the 4070 (CUDA) | text: KL 0.00000, top-1 100% on 300 rows; images: same verdict on 96.3% of 82 VL-RewardBench prompts, mean \|Δp\| 0.014 (different image resizing) | same weights and runtime as the 4070 path |
 | Memory | 8.6 GiB peak (text), 9.7 GiB with images | ~7.7 GB of iGPU memory (VRAM 2.96 + GTT 4.74 GB); 2.7 GB process RSS |
 | Prompt processing | — | 54 tok/s (`llama-bench` pp512) |
@@ -178,6 +178,14 @@ LLAMA_BIN=~/llama.cpp/build/bin bash Bonsai-JEV-weights/run_decide.sh start Bons
 hf download dakebakery/Bonsai-JEV --exclude "*PQ2_0*" --exclude "adapter.gguf" --exclude "peft/*" --exclude "head.*" --local-dir Bonsai-JEV-weights
 BASE_GGUF=Ternary-Bonsai-2-27B-PTQ1_0.gguf ADAPTER_FILE=adapter_f16.gguf CTX=4096 NP=1 \
   LLAMA_BIN=~/llama.cpp/build/bin bash Bonsai-JEV-weights/run_decide.sh start Bonsai-JEV-weights
+```
+
+On a Mac with 16 GB or more, use the MLX build instead (Prism's MLX 2-bit pack + this adapter in one repo, same `/v1/decide` API):
+
+```bash
+hf download dakebakery/Bonsai-JEV-mlx --local-dir Bonsai-JEV-mlx && cd Bonsai-JEV-mlx
+pip install -r runtime/requirements.txt fastapi uvicorn
+python mlx_serve.py --pack . --adapter . --port 8000
 ```
 
 ```bash

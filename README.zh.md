@@ -2,7 +2,7 @@
 
 **一个 8 GB 显卡就能跑、能看图、输出校准概率的 27B 决策模型。** 把 [JEV](https://huggingface.co/autotrust/JEV-27B) 的配方（LoRA + 24 位决策头，用软标签蒸馏）训练在 [Ternary Bonsai 2 27B](https://huggingface.co/prism-ml/Ternary-Bonsai-2-27B-gguf) 上。后者是 PrismML 把 Qwen3.8-27B 压缩成三值（−1/0/+1）的版本。底座保持三值、冻结不动，适配器是单独一个文件。对一个有类型的问题（是/否、0–5 打分、2–16 选 1），带图或不带图，一次前向就输出各选项的校准概率。
 
-**权重：** [ModelScope · dakepeng/Bonsai-JEV](https://modelscope.cn/models/dakepeng/Bonsai-JEV)（国内推荐）· [Hugging Face · dakebakery/Bonsai-JEV](https://huggingface.co/dakebakery/Bonsai-JEV)（两边文件相同）· [English](README.md)
+**权重：** [ModelScope · dakepeng/Bonsai-JEV](https://modelscope.cn/models/dakepeng/Bonsai-JEV)（国内推荐）· [Hugging Face · dakebakery/Bonsai-JEV](https://huggingface.co/dakebakery/Bonsai-JEV)（两边文件相同）· **Apple Silicon（MLX）：** [ModelScope · dakepeng/Bonsai-JEV-mlx](https://modelscope.cn/models/dakepeng/Bonsai-JEV-mlx) · [Hugging Face · dakebakery/Bonsai-JEV-mlx](https://huggingface.co/dakebakery/Bonsai-JEV-mlx) · [English](README.md)
 
 | | JEV-27B / JEV-27B-VL | **Bonsai-JEV** |
 |---|---|---|
@@ -149,7 +149,7 @@ JEV-27B-VL（公开）：单次前向 53.8，打开思考 61.5。我们单图题
 
 | | Mac mini M4，16 GB（MLX） | Ryzen 7 8745H + Radeon 780M 核显（Vulkan） |
 |---|---|---|
-| 做法 | Prism 的 [MLX 2-bit 包](https://huggingface.co/prism-ml/Ternary-Bonsai-2-27B-mlx-2bit) + 我们的 peft LoRA 和决策头，不需要转换（`mlx_decide.py`、`mlx_serve.py`） | PTQ1_0 + `adapter_f16.gguf`，走分支的 Vulkan 后端，`CACHE_RAM=2048` |
+| 做法 | [Bonsai-JEV-mlx](https://modelscope.cn/models/dakepeng/Bonsai-JEV-mlx)：Prism 的 MLX 2-bit 包 + 我们的 peft LoRA 和决策头，不需要转换（`mlx_decide.py`、`mlx_serve.py`） | PTQ1_0 + `adapter_f16.gguf`，走分支的 Vulkan 后端，`CACHE_RAM=2048` |
 | 和 4070（CUDA）的一致性 | 文本：300 行上 KL 0.00000，top-1 100%；看图：82 条 VL-RewardBench 提示中 96.3% 判断一致，平均 \|Δp\| 0.014（图片缩放方式不同） | 和 4070 是同一套权重和运行时 |
 | 内存 | 文本峰值 8.6 GiB，看图 9.7 GiB | 核显内存约 7.7 GB（显存 2.96 + GTT 4.74 GB）；进程 RSS 2.7 GB |
 | 预填充速度 | — | 54 token/秒（`llama-bench` pp512） |
@@ -178,6 +178,14 @@ LLAMA_BIN=~/llama.cpp/build/bin bash Bonsai-JEV-weights/run_decide.sh start Bons
 modelscope download --model dakepeng/Bonsai-JEV --exclude "*PQ2_0*" "adapter.gguf" "peft/*" "head.*" --local_dir Bonsai-JEV-weights
 BASE_GGUF=Ternary-Bonsai-2-27B-PTQ1_0.gguf ADAPTER_FILE=adapter_f16.gguf CTX=4096 NP=1 \
   LLAMA_BIN=~/llama.cpp/build/bin bash Bonsai-JEV-weights/run_decide.sh start Bonsai-JEV-weights
+```
+
+16 GB 及以上内存的 Mac 用 MLX 版（Prism 的 MLX 2-bit 包 + 本适配器，一个仓库，同样的 `/v1/decide` 接口）：
+
+```bash
+modelscope download --model dakepeng/Bonsai-JEV-mlx --local_dir Bonsai-JEV-mlx && cd Bonsai-JEV-mlx
+pip install -r runtime/requirements.txt fastapi uvicorn
+python mlx_serve.py --pack . --adapter . --port 8000
 ```
 
 ```bash
