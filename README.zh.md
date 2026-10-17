@@ -201,13 +201,13 @@ JEV-27B-VL（公开）：单次前向 53.8，打开思考 61.5。我们单图题
 ```bash
 pip install fastapi uvicorn requests pydantic pillow
 # 12 GB 以上显卡：PQ2_0 底座（约 8.3 GB）。两个来源任选，国内推荐 ModelScope
-modelscope download --model dakepeng/Bonsai-JEV --exclude "*PTQ1_0*" "adapter_f16.gguf" "peft/*" "head.*" --local_dir Bonsai-JEV-weights
-hf download dakebakery/Bonsai-JEV --exclude "*PTQ1_0*" --exclude "adapter_f16.gguf" --exclude "peft/*" --exclude "head.*" --local-dir Bonsai-JEV-weights
+modelscope download --model dakepeng/Bonsai-JEV --exclude "*PTQ1_0*" "adapter/adapter_f16.gguf" "peft/*" "head.*" --local_dir Bonsai-JEV-weights
+hf download dakebakery/Bonsai-JEV --exclude "*PTQ1_0*" --exclude "adapter/adapter_f16.gguf" --exclude "peft/*" --exclude "head.*" --local-dir Bonsai-JEV-weights
 # 启动 llama-server（:8080）和 /v1/decide 封装（:8000）；LLAMA_BIN 指向分支的 build/bin
 LLAMA_BIN=~/llama.cpp/build/bin bash Bonsai-JEV-weights/run_decide.sh start Bonsai-JEV-weights
 
 # 8 GB 显卡：PTQ1_0 底座 + fp16 适配器（下载约 6.8 GB）
-modelscope download --model dakepeng/Bonsai-JEV --exclude "*PQ2_0*" "adapter.gguf" "peft/*" "head.*" --local_dir Bonsai-JEV-weights
+modelscope download --model dakepeng/Bonsai-JEV --exclude "*PQ2_0*" "adapter/adapter.gguf" "peft/*" "head.*" --local_dir Bonsai-JEV-weights
 BASE_GGUF=Ternary-Bonsai-2-27B-PTQ1_0.gguf ADAPTER_FILE=adapter_f16.gguf CTX=4096 NP=1 \
   LLAMA_BIN=~/llama.cpp/build/bin bash Bonsai-JEV-weights/run_decide.sh start Bonsai-JEV-weights
 ```

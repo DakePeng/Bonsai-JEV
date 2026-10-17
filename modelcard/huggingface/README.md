@@ -31,8 +31,6 @@ tags:
 
 **Code, training recipe and evaluation scripts:** [github.com/DakePeng/Bonsai-JEV](https://github.com/DakePeng/Bonsai-JEV) · Mirror: [ModelScope](https://modelscope.cn/models/dakepeng/Bonsai-JEV)
 
-> **About the "GGUF" panel on this page:** the Hub summarises the repo from the 230 MB `adapter_f16.gguf`, so it shows "0.1B params" and an "F16" variant. That file is the LoRA adapter (115M parameters). The model is the 27B ternary base, `Ternary-Bonsai-2-27B-PQ2_0.gguf` (listed as "Q2_0") or `-PTQ1_0.gguf` ("TQ1_0"); the Hub does not know Prism ML's PQ2_0/PTQ1_0 types and shortens their names.
-
 The same weights also serve **System 2**: with the adapter switched off, the server is Ternary Bonsai 2 itself, byte for byte.
 
 > **Status (2026-10-15):** trained; all numbers below are measured through the deployment path (the fork running `adapter.gguf` on the ternary file). Decision Index: public vision suite 67.56 (level with d3-mini); text suite not run.
@@ -121,13 +119,13 @@ Build the [PrismML llama.cpp fork](https://github.com/PrismML-Eng/llama.cpp) fro
 ```bash
 pip install fastapi uvicorn requests pydantic pillow
 # 12 GB+ GPU: PQ2_0 base (~8.3 GB). Either source; ModelScope is faster from mainland China.
-hf download dakebakery/Bonsai-JEV --exclude "*PTQ1_0*" --exclude "adapter_f16.gguf" --exclude "peft/*" --exclude "head.*" --local-dir Bonsai-JEV-weights
-modelscope download --model dakepeng/Bonsai-JEV --exclude "*PTQ1_0*" "adapter_f16.gguf" "peft/*" "head.*" --local_dir Bonsai-JEV-weights
+hf download dakebakery/Bonsai-JEV --exclude "*PTQ1_0*" --exclude "adapter/adapter_f16.gguf" --exclude "peft/*" --exclude "head.*" --local-dir Bonsai-JEV-weights
+modelscope download --model dakepeng/Bonsai-JEV --exclude "*PTQ1_0*" "adapter/adapter_f16.gguf" "peft/*" "head.*" --local_dir Bonsai-JEV-weights
 # start llama-server (:8080) + the /v1/decide wrapper (:8000); LLAMA_BIN = the fork's build/bin
 LLAMA_BIN=~/llama.cpp/build/bin bash Bonsai-JEV-weights/run_decide.sh start Bonsai-JEV-weights
 
 # 8 GB GPU: PTQ1_0 base + fp16 adapter (~6.8 GB download)
-hf download dakebakery/Bonsai-JEV --exclude "*PQ2_0*" --exclude "adapter.gguf" --exclude "peft/*" --exclude "head.*" --local-dir Bonsai-JEV-weights
+hf download dakebakery/Bonsai-JEV --exclude "*PQ2_0*" --exclude "adapter/adapter.gguf" --exclude "peft/*" --exclude "head.*" --local-dir Bonsai-JEV-weights
 BASE_GGUF=Ternary-Bonsai-2-27B-PTQ1_0.gguf ADAPTER_FILE=adapter_f16.gguf CTX=4096 NP=1 \
   LLAMA_BIN=~/llama.cpp/build/bin bash Bonsai-JEV-weights/run_decide.sh start Bonsai-JEV-weights
 ```
@@ -174,9 +172,9 @@ The probabilities are read from the verbalizer tokens at `[decision]:` (`false/t
 |---|---:|---|
 | `Ternary-Bonsai-2-27B-PQ2_0.gguf` | 7.2 GB | Prism ML's base, byte-identical to the validated file |
 | `Ternary-Bonsai-2-27B-PTQ1_0.gguf` | 5.95 GB | the same weights, denser packing; for 8 GB cards (`BASE_GGUF=Ternary-Bonsai-2-27B-PTQ1_0.gguf`) |
-| `adapter_f16.gguf` | 0.23 GB | the adapter in fp16, for 8 GB cards (`ADAPTER_FILE=adapter_f16.gguf`) |
+| `adapter/adapter_f16.gguf` | 0.23 GB | the adapter in fp16, for 8 GB cards (`ADAPTER_FILE=adapter_f16.gguf`) |
 | `Ternary-Bonsai-2-27B-mmproj-Q8_0.gguf` | 0.6 GB | vision projector |
-| `adapter.gguf` | 0.46 GB | LoRA on all 64 layers + the decision head as a rank-24 LoRA on `output.weight` |
+| `adapter/adapter.gguf` | 0.46 GB | LoRA on all 64 layers + the decision head as a rank-24 LoRA on `output.weight` |
 | `decision.json` | — | head bias, verbalizer ids, slot ranges, per-kind temperatures |
 | `peft/`, `head.safetensors` | 0.44 GB | the same adapter for PyTorch / further training |
 | `calibration.json`, `head.json` | — | fitted temperatures and fit statistics; head metadata (step 4,000) |

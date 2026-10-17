@@ -203,13 +203,13 @@ Everything needed to serve (base GGUF, vision projector, adapter, calibration) i
 ```bash
 pip install fastapi uvicorn requests pydantic pillow
 # 12 GB+ GPU: PQ2_0 base (~8.3 GB). Either source; ModelScope is faster from mainland China.
-hf download dakebakery/Bonsai-JEV --exclude "*PTQ1_0*" --exclude "adapter_f16.gguf" --exclude "peft/*" --exclude "head.*" --local-dir Bonsai-JEV-weights
-modelscope download --model dakepeng/Bonsai-JEV --exclude "*PTQ1_0*" "adapter_f16.gguf" "peft/*" "head.*" --local_dir Bonsai-JEV-weights
+hf download dakebakery/Bonsai-JEV --exclude "*PTQ1_0*" --exclude "adapter/adapter_f16.gguf" --exclude "peft/*" --exclude "head.*" --local-dir Bonsai-JEV-weights
+modelscope download --model dakepeng/Bonsai-JEV --exclude "*PTQ1_0*" "adapter/adapter_f16.gguf" "peft/*" "head.*" --local_dir Bonsai-JEV-weights
 # start llama-server (:8080) + the /v1/decide wrapper (:8000); LLAMA_BIN = the fork's build/bin
 LLAMA_BIN=~/llama.cpp/build/bin bash Bonsai-JEV-weights/run_decide.sh start Bonsai-JEV-weights
 
 # 8 GB GPU: PTQ1_0 base + fp16 adapter (~6.8 GB download)
-hf download dakebakery/Bonsai-JEV --exclude "*PQ2_0*" --exclude "adapter.gguf" --exclude "peft/*" --exclude "head.*" --local-dir Bonsai-JEV-weights
+hf download dakebakery/Bonsai-JEV --exclude "*PQ2_0*" --exclude "adapter/adapter.gguf" --exclude "peft/*" --exclude "head.*" --local-dir Bonsai-JEV-weights
 BASE_GGUF=Ternary-Bonsai-2-27B-PTQ1_0.gguf ADAPTER_FILE=adapter_f16.gguf CTX=4096 NP=1 \
   LLAMA_BIN=~/llama.cpp/build/bin bash Bonsai-JEV-weights/run_decide.sh start Bonsai-JEV-weights
 ```

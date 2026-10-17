@@ -32,7 +32,9 @@ case "${1:-start}" in
     BASE=${BASE_GGUF:-Ternary-Bonsai-2-27B-PQ2_0.gguf}
     [ -n "$ADAPTER" ] && [ -f "$ADAPTER/$BASE" ] && M=$ADAPTER
     LORA=""; DJ=""
-    if [ -n "$ADAPTER" ]; then LORA="--lora $ADAPTER/${ADAPTER_FILE:-adapter.gguf} --lora-init-without-apply"; DJ="$ADAPTER/decision.json"; fi
+    AF=${ADAPTER_FILE:-adapter.gguf}   # release repos keep it under adapter/ (so the Hub summarises the base GGUF), checkpoints at the top
+    [ -n "$ADAPTER" ] && [ ! -f "$ADAPTER/$AF" ] && [ -f "$ADAPTER/adapter/$AF" ] && AF=adapter/$AF
+    if [ -n "$ADAPTER" ]; then LORA="--lora $ADAPTER/$AF --lora-init-without-apply"; DJ="$ADAPTER/decision.json"; fi
     case "${MMPROJ:-gpu}" in
       gpu)  MM="--mmproj $M/Ternary-Bonsai-2-27B-mmproj-Q8_0.gguf" ;;
       cpu)  MM="--mmproj $M/Ternary-Bonsai-2-27B-mmproj-Q8_0.gguf --no-mmproj-offload" ;;

@@ -120,13 +120,13 @@ JEV-27B 模型卡上的其他指标，同样的行、同样的定义：
 ```bash
 pip install fastapi uvicorn requests pydantic pillow
 # 12 GB 以上显卡：PQ2_0 底座（约 8.3 GB）。两个来源任选，国内推荐 ModelScope
-modelscope download --model dakepeng/Bonsai-JEV --exclude "*PTQ1_0*" "adapter_f16.gguf" "peft/*" "head.*" --local_dir Bonsai-JEV-weights
-hf download dakebakery/Bonsai-JEV --exclude "*PTQ1_0*" --exclude "adapter_f16.gguf" --exclude "peft/*" --exclude "head.*" --local-dir Bonsai-JEV-weights
+modelscope download --model dakepeng/Bonsai-JEV --exclude "*PTQ1_0*" "adapter/adapter_f16.gguf" "peft/*" "head.*" --local_dir Bonsai-JEV-weights
+hf download dakebakery/Bonsai-JEV --exclude "*PTQ1_0*" --exclude "adapter/adapter_f16.gguf" --exclude "peft/*" --exclude "head.*" --local-dir Bonsai-JEV-weights
 # 启动 llama-server（:8080）和 /v1/decide 封装（:8000）；LLAMA_BIN 指向分支的 build/bin
 LLAMA_BIN=~/llama.cpp/build/bin bash Bonsai-JEV-weights/run_decide.sh start Bonsai-JEV-weights
 
 # 8 GB 显卡：PTQ1_0 底座 + fp16 适配器（下载约 6.8 GB）
-modelscope download --model dakepeng/Bonsai-JEV --exclude "*PQ2_0*" "adapter.gguf" "peft/*" "head.*" --local_dir Bonsai-JEV-weights
+modelscope download --model dakepeng/Bonsai-JEV --exclude "*PQ2_0*" "adapter/adapter.gguf" "peft/*" "head.*" --local_dir Bonsai-JEV-weights
 BASE_GGUF=Ternary-Bonsai-2-27B-PTQ1_0.gguf ADAPTER_FILE=adapter_f16.gguf CTX=4096 NP=1 \
   LLAMA_BIN=~/llama.cpp/build/bin bash Bonsai-JEV-weights/run_decide.sh start Bonsai-JEV-weights
 ```
@@ -173,9 +173,9 @@ B) <选项 2>
 |---|---:|---|
 | `Ternary-Bonsai-2-27B-PQ2_0.gguf` | 7.2 GB | Prism ML 的底座，和验证时用的文件逐字节一致 |
 | `Ternary-Bonsai-2-27B-PTQ1_0.gguf` | 5.95 GB | 同一套权重的更紧凑打包，给 8 GB 显卡用（`BASE_GGUF=Ternary-Bonsai-2-27B-PTQ1_0.gguf`） |
-| `adapter_f16.gguf` | 0.23 GB | fp16 版适配器，给 8 GB 显卡用（`ADAPTER_FILE=adapter_f16.gguf`） |
+| `adapter/adapter_f16.gguf` | 0.23 GB | fp16 版适配器，给 8 GB 显卡用（`ADAPTER_FILE=adapter_f16.gguf`） |
 | `Ternary-Bonsai-2-27B-mmproj-Q8_0.gguf` | 0.6 GB | 视觉投影 |
-| `adapter.gguf` | 0.46 GB | 64 层上的 LoRA + 作为 `output.weight` 上 rank-24 LoRA 的决策头 |
+| `adapter/adapter.gguf` | 0.46 GB | 64 层上的 LoRA + 作为 `output.weight` 上 rank-24 LoRA 的决策头 |
 | `decision.json` | — | 决策头偏置、verbalizer id、槽位范围、按类型温度 |
 | `peft/`、`head.safetensors` | 0.44 GB | 同一个适配器的 PyTorch 版本，可继续训练 |
 | `calibration.json`、`head.json` | — | 拟合的温度和拟合统计；决策头元数据（第 4,000 步） |
